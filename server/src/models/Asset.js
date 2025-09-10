@@ -23,6 +23,17 @@ const BomItemSchema = new mongoose.Schema(
 
 const AssetSchema = new mongoose.Schema(
   {
+    // … existing fields …
+    attachments: { type: [AttachmentSchema], default: [] },
+
+    // new
+    mainPhoto: { type: String, default: '' },
+  },
+  { timestamps: true }
+);
+
+const AssetSchema = new mongoose.Schema(
+  {
     client: { type: ObjectId, ref: 'Client', required: true, index: true },
     location: { type: ObjectId, ref: 'Location', required: true, index: true },
     name: { type: String, required: true, trim: true },

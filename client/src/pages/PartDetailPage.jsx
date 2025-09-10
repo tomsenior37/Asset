@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getPart, updatePart, listClients, getLocationTree } from '../services/api';
+import { getPart, updatePart } from '../services/api';
 import { Tabs, Tab, TextField, Button, Table, TableHead, TableBody, TableCell, TableRow, Select, MenuItem } from '@mui/material';
 import { useAuth } from '../AuthContext.jsx';
 
@@ -10,8 +10,6 @@ export default function PartDetailPage(){
   const [tab, setTab] = useState(0);
   const [p, setP] = useState(null);
   const [form, setForm] = useState({});
-  const [clients, setClients] = useState([]);
-  const [sites, setSites] = useState([]);
 
   useEffect(() => { (async()=>{
     const part = await getPart(id);
@@ -22,22 +20,13 @@ export default function PartDetailPage(){
       specs: part.specs || {},
       supplierOptions: part.supplierOptions || [],
       internal: {
+        onHand: part.internal?.onHand || 0,
         standardCost: part.internal?.standardCost || 0,
         reorderPoint: part.internal?.reorderPoint || 0,
-        reorderQty: part.internal?.reorderQty || 0,
-        stockBySite: part.internal?.stockBySite || []
+        reorderQty: part.internal?.reorderQty || 0
       }
     });
-    setClients(await listClients());
   })(); }, [id]);
-
-  async function pickClient(clientId){
-    const tree = await getLocationTree(clientId);
-    const flat = [];
-    const walk = (n)=>{ if(n.kind==='site') flat.push(n); (n.children||[]).forEach(walk); };
-    tree.forEach(walk);
-    setSites(flat);
-  }
 
   async function save(){
     const out = await updatePart(id, form);
@@ -48,10 +37,10 @@ export default function PartDetailPage(){
       specs: out.specs || {},
       supplierOptions: out.supplierOptions || [],
       internal: {
+        onHand: out.internal?.onHand || 0,
         standardCost: out.internal?.standardCost || 0,
         reorderPoint: out.internal?.reorderPoint || 0,
-        reorderQty: out.internal?.reorderQty || 0,
-        stockBySite: out.internal?.stockBySite || []
+        reorderQty: out.internal?.reorderQty || 0
       }
     });
   }
@@ -70,7 +59,7 @@ export default function PartDetailPage(){
       <Tabs value={tab} onChange={(_,v)=>setTab(v)} sx={{mb:1}}>
         <Tab label="Overview" />
         <Tab label="Suppliers" />
-        <Tab label="Stock" />
+        <Tab label="Inventory" />
         <Tab label="Specs" />
       </Tabs>
 
@@ -95,7 +84,8 @@ export default function PartDetailPage(){
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Supplier ID / SKU</TableCell>
+                <TableCell>Supplier ID</TableCell>
+                <TableCell>Supplier SKU</TableCell>
                 <TableCell>Price</TableCell>
                 <TableCell>Currency</TableCell>
                 <TableCell>Lead (days)</TableCell>
@@ -107,33 +97,43 @@ export default function PartDetailPage(){
               {(form.supplierOptions||[]).map((opt, i)=>(
                 <TableRow key={i}>
                   <TableCell>
-                    <div className="row">
-                      <TextField label="Supplier" value={opt.supplier||''} onChange={e=>{
-                        const arr=[...form.supplierOptions]; arr[i]={...arr[i], supplier:e.target.value}; setForm({...form, supplierOptions:arr});
-                      }}/>
-                      <TextField label="Supplier SKU" value={opt.supplierSku||''} onChange={e=>{
-                        const arr=[...form.supplierOptions]; arr[i]={...arr[i], supplierSku:e.target.value}; setForm({...form, supplierOptions:arr});
-                      }}/>
-                    </div>
+                    <TextField value={opt.supplier||''} onChange={e=>{
+                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], supplier:e.target.value}; setForm({...form, supplierOptions:arr});
+                    }}/>
                   </TableCell>
-                  <TableCell><TextField type="number" value={opt.price||0} onChange={e=>{
-                    const arr=[...form.supplierOptions]; arr[i]={...arr[i], price:Number(e.target.value)}; setForm({...form, supplierOptions:arr});
-                  }}/></TableCell>
-                  <TableCell><TextField value={opt.currency||'USD'} onChange={e=>{
-                    const arr=[...form.supplierOptions]; arr[i]={...arr[i], currency:e.target.value}; setForm({...form, supplierOptions:arr});
-                  }}/></TableCell>
-                  <TableCell><TextField type="number" value={opt.leadTimeDays||0} onChange={e=>{
-                    const arr=[...form.supplierOptions]; arr[i]={...arr[i], leadTimeDays:Number(e.target.value)}; setForm({...form, supplierOptions:arr});
-                  }}/></TableCell>
-                  <TableCell><TextField type="number" value={opt.moq||1} onChange={e=>{
-                    const arr=[...form.supplierOptions]; arr[i]={...arr[i], moq:Number(e.target.value)}; setForm({...form, supplierOptions:arr});
-                  }}/></TableCell>
-                  <TableCell><Select value={opt.preferred? 'yes':'no'} onChange={e=>{
-                    const arr=[...form.supplierOptions]; arr[i]={...arr[i], preferred: e.target.value==='yes'}; setForm({...form, supplierOptions:arr});
-                  }}>
-                    <MenuItem value="no">no</MenuItem>
-                    <MenuItem value="yes">yes</MenuItem>
-                  </Select></TableCell>
+                  <TableCell>
+                    <TextField value={opt.supplierSku||''} onChange={e=>{
+                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], supplierSku:e.target.value}; setForm({...form, supplierOptions:arr});
+                    }}/>
+                  </TableCell>
+                  <TableCell>
+                    <TextField type="number" value={opt.price||0} onChange={e=>{
+                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], price:Number(e.target.value)}; setForm({...form, supplierOptions:arr});
+                    }}/>
+                  </TableCell>
+                  <TableCell>
+                    <TextField value={opt.currency||'USD'} onChange={e=>{
+                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], currency:e.target.value}; setForm({...form, supplierOptions:arr});
+                    }}/>
+                  </TableCell>
+                  <TableCell>
+                    <TextField type="number" value={opt.leadTimeDays||0} onChange={e=>{
+                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], leadTimeDays:Number(e.target.value)}; setForm({...form, supplierOptions:arr});
+                    }}/>
+                  </TableCell>
+                  <TableCell>
+                    <TextField type="number" value={opt.moq||1} onChange={e=>{
+                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], moq:Number(e.target.value)}; setForm({...form, supplierOptions:arr});
+                    }}/>
+                  </TableCell>
+                  <TableCell>
+                    <Select value={opt.preferred? 'yes':'no'} onChange={e=>{
+                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], preferred: e.target.value==='yes'}; setForm({...form, supplierOptions:arr});
+                    }}>
+                      <MenuItem value="no">no</MenuItem>
+                      <MenuItem value="yes">yes</MenuItem>
+                    </Select>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -142,51 +142,25 @@ export default function PartDetailPage(){
         </div>
       )}
 
-      {/* Stock */}
+      {/* Inventory */}
       {tab===2 && (
         <div className="card">
-          <h3>Stock By Site</h3>
+          <h3>Inventory (Internal)</h3>
           <div className="row">
-            <Select displayEmpty value="" onChange={e=>pickClient(e.target.value)}>
-              <MenuItem value="">Pick client for sites</MenuItem>
-              {clients.map(c=><MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>)}
-            </Select>
+            <TextField label="On hand" type="number" value={form.internal?.onHand ?? 0} onChange={e=>{
+              setForm({...form, internal:{ ...(form.internal||{}), onHand:Number(e.target.value) }});
+            }} />
+            <TextField label="Std Cost" type="number" value={form.internal?.standardCost ?? 0} onChange={e=>{
+              setForm({...form, internal:{ ...(form.internal||{}), standardCost:Number(e.target.value) }});
+            }} />
+            <TextField label="Reorder Point" type="number" value={form.internal?.reorderPoint ?? 0} onChange={e=>{
+              setForm({...form, internal:{ ...(form.internal||{}), reorderPoint:Number(e.target.value) }});
+            }} />
+            <TextField label="Reorder Qty" type="number" value={form.internal?.reorderQty ?? 0} onChange={e=>{
+              setForm({...form, internal:{ ...(form.internal||{}), reorderQty:Number(e.target.value) }});
+            }} />
           </div>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Site ID</TableCell>
-                <TableCell>Qty</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(form.internal?.stockBySite||[]).map((s, i)=>(
-                <TableRow key={i}>
-                  <TableCell>
-                    <Select value={s.site||''} onChange={e=>{
-                      const arr=[...(form.internal?.stockBySite||[])]; arr[i]={...arr[i], site:e.target.value};
-                      setForm({...form, internal:{ ...(form.internal||{}), stockBySite:arr }});
-                    }}>
-                      {sites.map(site => <MenuItem key={site._id} value={site._id}>{site.name}</MenuItem>)}
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <TextField type="number" value={s.qty||0} onChange={e=>{
-                      const arr=[...(form.internal?.stockBySite||[])]; arr[i]={...arr[i], qty:Number(e.target.value)};
-                      setForm({...form, internal:{ ...(form.internal||{}), stockBySite:arr }});
-                    }}/>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div style={{marginTop:8}}>
-            <Button variant="outlined" onClick={()=>{
-              const arr=[...(form.internal?.stockBySite||[]), { site:'', qty:0 }];
-              setForm({...form, internal:{ ...(form.internal||{}), stockBySite:arr }});
-            }}>+ Row</Button>
-            {isAdmin && <Button variant="contained" style={{marginLeft:8}} onClick={save}>Save</Button>}
-          </div>
+          {isAdmin && <div style={{marginTop:8}}><Button variant="contained" onClick={save}>Save</Button></div>}
         </div>
       )}
 

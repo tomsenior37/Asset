@@ -156,3 +156,63 @@ export default function AssetDetailPage(){
     </div>
   )
 }
+import { Tabs, Tab } from '@mui/material'
+import { listAssetAttachments, uploadAssetAttachment,
+         deleteAssetAttachment, setMainPhoto } from '../services/api'
+
+export default function AssetDetailPage() {
+  const { id } = useParams()
+  const [tab, setTab] = useState(0)
+  const [asset, setAsset] = useState(null)
+  const [attachments, setAttachments] = useState([])
+
+  useEffect(() => {
+    (async () => {
+      const a = await getAsset(id)
+      setAsset(a)
+      setAttachments(await listAssetAttachments(id))
+    })()
+  }, [id])
+
+  return (
+    <div>
+      <div className="card">
+        <h2>{asset?.name}</h2>
+        {asset?.mainPhoto
+          ? <img src={`${import.meta.env.VITE_API_BASE}/uploads/assets/${id}/${asset.mainPhoto}`} style={{maxHeight:200}}/>
+          : <em>No photo</em>}
+      </div>
+
+      <Tabs value={tab} onChange={(_,v)=>setTab(v)}>
+        <Tab label="BOM"/>
+        <Tab label="Documents"/>
+      </Tabs>
+
+      {tab===0 && <BomEditor asset={asset} onSave={…}/>}
+      {tab===1 &&
+        <div>
+          <input type="file" onChange={async e=>{
+            const f=e.target.files[0]; if(!f) return
+            await uploadAssetAttachment(id, f)
+            setAttachments(await listAssetAttachments(id))
+          }}/>
+          <ul>
+            {attachments.map(att=>(
+              <li key={att.filename}>
+                {att.originalname}
+                <a href={`${import.meta.env.VITE_API_BASE}/uploads/assets/${id}/${att.filename}`} target="_blank">Open</a>
+                <button onClick={async()=>{
+                  await deleteAssetAttachment(id, att.filename)
+                  setAttachments(await listAssetAttachments(id))
+                }}>Delete</button>
+                <button onClick={async()=>{
+                  await setMainPhoto(id, att.filename)
+                  setAsset(await getAsset(id))
+                }}>Set as main</button>
+              </li>
+            ))}
+          </ul>
+        </div>}
+    </div>
+  )
+}

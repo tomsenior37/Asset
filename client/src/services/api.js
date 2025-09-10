@@ -26,7 +26,7 @@ export async function createLocation(clientId, payload){
   const { data } = await api.post(`/clients/${clientId}/locations`, payload); return data;
 }
 
-/* -------------------- Suppliers (FIX) -------------------- */
+/* -------------------- Suppliers -------------------- */
 export async function listSuppliers(){
   const { data } = await api.get('/suppliers'); return data;
 }
@@ -56,7 +56,7 @@ export async function updateAsset(id, payload){
   const { data } = await api.patch('/assets/' + id, payload); return data;
 }
 
-/* ---- Attachments + Main Photo ---- */
+/* ---- Asset Attachments + Main Photo ---- */
 export async function listAssetAttachments(id) {
   const { data } = await api.get(`/assets/${id}/attachments`); return data;
 }
@@ -73,6 +73,30 @@ export async function deleteAssetAttachment(id, filename) {
 }
 export async function setMainPhoto(id, filename) {
   const { data } = await api.post(`/assets/${id}/main-photo`, { filename }); return data;
+}
+
+/* -------------------- BOM Templates -------------------- */
+export async function listBomTemplates(params){
+  const { data } = await api.get('/bom-templates', { params }); return data;
+}
+export async function createBomTemplate(payload){
+  const { data } = await api.post('/bom-templates', payload); return data;
+}
+export async function updateBomTemplate(id, payload){
+  const { data } = await api.patch('/bom-templates/' + id, payload); return data;
+}
+export async function deleteBomTemplate(id){
+  const { data } = await api.delete('/bom-templates/' + id); return data;
+}
+
+/* ---- Apply template / Clone BOM to asset ---- */
+export async function applyTemplateToAsset(assetId, { templateId, mode='append' }){
+  const { data } = await api.post(`/assets/${assetId}/apply-template`, { templateId, mode });
+  return data;
+}
+export async function cloneBomFromAsset(assetId, { fromAssetId, mode='append' }){
+  const { data } = await api.post(`/assets/${assetId}/clone-bom`, { fromAssetId, mode });
+  return data;
 }
 
 /* -------------------- Auth -------------------- */

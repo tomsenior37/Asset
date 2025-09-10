@@ -135,6 +135,21 @@ router.post('/:id/attachments', requireAuth, upload.single('file'), async (req, 
   res.status(201).json({ ok: true, attachment: asset.attachments[asset.attachments.length-1] });
 });
 
+// set main photo
+router.post('/:id/main-photo', requireAuth, async (req, res) => {
+  const { filename } = req.body || {};
+  const asset = await Asset.findById(req.params.id);
+  if (!asset) return res.status(404).json({ error: 'Asset not found' });
+
+  if (!asset.attachments.find(a => a.filename === filename)) {
+    return res.status(400).json({ error: 'Attachment not found on asset' });
+  }
+
+  asset.mainPhoto = filename;
+  await asset.save();
+  res.json({ ok: true, mainPhoto: asset.mainPhoto });
+});
+
 router.get('/:id/attachments', async (req, res) => {
   const asset = await Asset.findById(req.params.id).lean();
   if (!asset) return res.status(404).json({ error: 'Asset not found' });

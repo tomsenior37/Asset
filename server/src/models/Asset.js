@@ -23,17 +23,6 @@ const BomItemSchema = new mongoose.Schema(
 
 const AssetSchema = new mongoose.Schema(
   {
-    // … existing fields …
-    attachments: { type: [AttachmentSchema], default: [] },
-
-    // new
-    mainPhoto: { type: String, default: '' },
-  },
-  { timestamps: true }
-);
-
-const AssetSchema = new mongoose.Schema(
-  {
     client: { type: ObjectId, ref: 'Client', required: true, index: true },
     location: { type: ObjectId, ref: 'Location', required: true, index: true },
     name: { type: String, required: true, trim: true },
@@ -43,15 +32,24 @@ const AssetSchema = new mongoose.Schema(
     serial: { type: String, default: '', trim: true },
     status: { type: String, enum: ['active', 'spare', 'retired', 'missing'], default: 'active' },
     notes: { type: String, default: '' },
+
+    // BOM & docs
     bom: { type: [BomItemSchema], default: [] },
+    attachments: { type: [AttachmentSchema], default: [] },
+
+    // NEW: main photo is a filename from attachments
+    mainPhoto: { type: String, default: '' },
+
     purchaseDate: { type: Date },
     supplier: { type: String, default: '' },
-    attachments: { type: [AttachmentSchema], default: [] }
   },
   { timestamps: true }
 );
 
-AssetSchema.index({ client: 1, serial: 1 }, { unique: true, partialFilterExpression: { serial: { $type: 'string', $ne: '' } } });
+AssetSchema.index(
+  { client: 1, serial: 1 },
+  { unique: true, partialFilterExpression: { serial: { $type: 'string', $ne: '' } } }
+);
 AssetSchema.index({ name: 'text', tag: 'text', model: 'text', serial: 'text', category: 'text' });
 
 export default mongoose.model('Asset', AssetSchema);

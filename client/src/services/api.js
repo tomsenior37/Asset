@@ -50,3 +50,15 @@ export async function cloneBomFromAsset(assetId, { fromAssetId, mode='append' })
   const { data } = await api.post('/assets/' + assetId + '/clone-bom', { fromAssetId, mode });
   return data;
 }
+export async function listAssetAttachments(id) {
+  const { data } = await api.get(`/assets/${id}/attachments`);
+  return data;
+}
+export async function deleteAssetAttachment(id, filename) {
+  const { data } = await api.delete(`/assets/${id}/attachments/${filename}`);
+  return data;
+}
+export async function setMainPhoto(id, filename) {
+  const { data } = await api.post(`/assets/${id}/main-photo`, { filename });
+  return data;
+}

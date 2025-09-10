@@ -17,6 +17,12 @@ export async function listClients() {
 export async function createClient(payload){
   const { data } = await api.post('/clients', payload); return data;
 }
+export async function getClient(id){
+  const { data } = await api.get('/clients/' + id); return data;
+}
+export async function updateClient(id, payload){
+  const { data } = await api.patch('/clients/' + id, payload); return data;
+}
 
 /* -------------------- Locations -------------------- */
 export async function getLocationTree(clientId){
@@ -40,6 +46,12 @@ export async function listParts(params){
 }
 export async function createPart(payload){
   const { data } = await api.post('/parts', payload); return data;
+}
+export async function getPart(id){
+  const { data } = await api.get('/parts/' + id); return data;
+}
+export async function updatePart(id, payload){
+  const { data } = await api.patch('/parts/' + id, payload); return data;
 }
 
 /* -------------------- Assets -------------------- */
@@ -88,8 +100,6 @@ export async function updateBomTemplate(id, payload){
 export async function deleteBomTemplate(id){
   const { data } = await api.delete('/bom-templates/' + id); return data;
 }
-
-/* ---- Apply template / Clone BOM to asset ---- */
 export async function applyTemplateToAsset(assetId, { templateId, mode='append' }){
   const { data } = await api.post(`/assets/${assetId}/apply-template`, { templateId, mode });
   return data;

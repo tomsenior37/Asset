@@ -10,12 +10,12 @@ import Asset from '../models/Asset.js';
 import Client from '../models/Client.js';
 import Location from '../models/Location.js';
 import Part from '../models/Part.js';
-import BomTemplate from '../models/BomTemplate.js';
 import { paginateParams } from '../utils/paginate.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// ---------- uploads root ----------
 const uploadRoot = path.resolve(process.cwd(), 'uploads', 'assets');
 fs.mkdirSync(uploadRoot, { recursive: true });
 
@@ -31,6 +31,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ---------- validation ----------
 const bomItem = z.object({
   part: z.string().optional().nullable(),
   partName: z.string().optional().default(''),
@@ -52,9 +53,11 @@ const assetSchema = z.object({
   notes: z.string().optional().default(''),
   bom: z.array(bomItem).optional().default([]),
   purchaseDate: z.coerce.date().optional(),
-  supplier: z.string().optional().default('')
+  supplier: z.string().optional().default(''),
+  mainPhoto: z.string().optional().default('')
 });
 
+// ---------- list ----------
 router.get('/', async (req, res) => {
   const { page, limit, skip } = paginateParams(req);
   const q = req.query.q ? String(req.query.q) : '';
@@ -73,6 +76,7 @@ router.get('/', async (req, res) => {
   res.json({ items, total, page, pages: Math.ceil(total / limit) });
 });
 
+// ---------- create ----------
 router.post('/', requireAuth, async (req, res) => {
   const data = assetSchema.parse(req.body);
   const [c, l] = await Promise.all([
@@ -92,12 +96,14 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json(made);
 });
 
+// ---------- read ----------
 router.get('/:id', async (req, res) => {
   const item = await Asset.findById(req.params.id).lean();
   if (!item) return res.status(404).json({ error: 'Asset not found' });
   res.json(item);
 });
 
+// ---------- update ----------
 router.patch('/:id', requireAuth, async (req, res) => {
   const data = assetSchema.partial().parse(req.body);
   const item = await Asset.findByIdAndUpdate(req.params.id, data, { new: true });
@@ -105,12 +111,14 @@ router.patch('/:id', requireAuth, async (req, res) => {
   res.json(item);
 });
 
+// ---------- delete ----------
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const out = await Asset.findByIdAndDelete(req.params.id);
   if (!out) return res.status(404).json({ error: 'Asset not found' });
   res.json({ ok: true });
 });
 
+// ---------- move ----------
 router.patch('/:id/move', requireAuth, async (req, res) => {
   const schema = z.object({ location: z.string().min(1) });
   const { location } = schema.parse(req.body);
@@ -121,7 +129,7 @@ router.patch('/:id/move', requireAuth, async (req, res) => {
   res.json(item);
 });
 
-// attachments
+// ---------- attachments ----------
 router.post('/:id/attachments', requireAuth, upload.single('file'), async (req, res) => {
   const asset = await Asset.findById(req.params.id);
   if (!asset) return res.status(404).json({ error: 'Asset not found' });
@@ -135,21 +143,6 @@ router.post('/:id/attachments', requireAuth, upload.single('file'), async (req, 
   res.status(201).json({ ok: true, attachment: asset.attachments[asset.attachments.length-1] });
 });
 
-// set main photo
-router.post('/:id/main-photo', requireAuth, async (req, res) => {
-  const { filename } = req.body || {};
-  const asset = await Asset.findById(req.params.id);
-  if (!asset) return res.status(404).json({ error: 'Asset not found' });
-
-  if (!asset.attachments.find(a => a.filename === filename)) {
-    return res.status(400).json({ error: 'Attachment not found on asset' });
-  }
-
-  asset.mainPhoto = filename;
-  await asset.save();
-  res.json({ ok: true, mainPhoto: asset.mainPhoto });
-});
-
 router.get('/:id/attachments', async (req, res) => {
   const asset = await Asset.findById(req.params.id).lean();
   if (!asset) return res.status(404).json({ error: 'Asset not found' });
@@ -161,12 +154,28 @@ router.delete('/:id/attachments/:filename', requireAuth, async (req, res) => {
   const dest = path.join(uploadRoot, id, filename);
   if (fs.existsSync(dest)) fs.unlinkSync(dest);
   await Asset.updateOne({ _id: id }, { $pull: { attachments: { filename } } });
+  // clear mainPhoto if it was this file
+  await Asset.updateOne({ _id: id, mainPhoto: filename }, { $set: { mainPhoto: '' } });
   res.json({ ok: true });
 });
 
-// CSV import/export
+// ---------- set main photo ----------
+router.post('/:id/main-photo', requireAuth, async (req, res) => {
+  const { filename } = req.body || {};
+  const asset = await Asset.findById(req.params.id);
+  if (!asset) return res.status(404).json({ error: 'Asset not found' });
+
+  if (!asset.attachments.find(a => a.filename === filename)) {
+    return res.status(400).json({ error: 'Attachment not found on asset' });
+  }
+
+  asset.mainPhoto = filename || '';
+  await asset.save();
+  res.json({ ok: true, mainPhoto: asset.mainPhoto });
+});
+
+// ---------- CSV import/export ----------
 router.post('/import', requireAuth, requireRole('admin'), async (req, res) => {
-  // CSV columns: clientCode,siteCode,areaCode,name,tag,category,model,serial,status,notes
   const chunks = [];
   req.on('data', (c) => chunks.push(c));
   req.on('end', async () => {
@@ -248,56 +257,3 @@ router.get('/export/csv', async (_req, res) => {
 });
 
 export default router;
-
-
-// apply a BOM template to this asset
-router.post('/:id/apply-template', requireAuth, async (req, res) => {
-  const { templateId, mode = 'append' } = req.body || {};
-  const asset = await Asset.findById(req.params.id);
-  if (!asset) return res.status(404).json({ error: 'Asset not found' });
-  const tmpl = await BomTemplate.findById(templateId).lean();
-  if (!tmpl) return res.status(404).json({ error: 'Template not found' });
-
-  const incoming = (tmpl.lines || []).map(l => ({
-    part: l.part || undefined,
-    partName: l.partName || '',
-    partNo: l.partNo || '',
-    qty: Number(l.qty || 1),
-    unit: l.unit || 'ea',
-    notes: l.notes || ''
-  }));
-
-  if (mode === 'replace') {
-    asset.bom = incoming;
-  } else {
-    asset.bom = [...(asset.bom || []), ...incoming];
-  }
-  await asset.save();
-  res.json(asset);
-});
-
-// clone BOM from another asset
-router.post('/:id/clone-bom', requireAuth, async (req, res) => {
-  const { fromAssetId, mode = 'append' } = req.body || {};
-  const asset = await Asset.findById(req.params.id);
-  if (!asset) return res.status(404).json({ error: 'Target asset not found' });
-  const from = await Asset.findById(fromAssetId).lean();
-  if (!from) return res.status(404).json({ error: 'Source asset not found' });
-
-  const incoming = (from.bom || []).map(l => ({
-    part: l.part || undefined,
-    partName: l.partName || '',
-    partNo: l.partNo || '',
-    qty: Number(l.qty || 1),
-    unit: l.unit || 'ea',
-    notes: l.notes || ''
-  }));
-
-  if (mode === 'replace') {
-    asset.bom = incoming;
-  } else {
-    asset.bom = [...(asset.bom || []), ...incoming];
-  }
-  await asset.save();
-  res.json(asset);
-});

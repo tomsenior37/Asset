@@ -1,40 +1,42 @@
-import React, { useEffect, useState } from 'react'
-import { listClients, createClient } from '../services/api'
-import { Table, TableBody, TableCell, TableHead, TableRow, TextField, Button } from '@mui/material'
-import { useAuth } from '../AuthContext.jsx'
+import React, { useEffect, useState } from 'react';
+import { listClients, createClient } from '../services/api';
+import { Table, TableBody, TableCell, TableHead, TableRow, TextField, Button } from '@mui/material';
+import { useAuth } from '../AuthContext.jsx';
+import { Link } from 'react-router-dom';
 
 export default function ClientsPage(){
-  const { isAdmin } = useAuth()
-  const [items, setItems] = useState([])
-  const [form, setForm] = useState({ name: '', code: '' })
+  const { isAdmin } = useAuth();
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ name: '', code: '' });
 
   async function refresh(){
-    const data = await listClients()
-    setItems(data)
+    const data = await listClients();
+    setItems(data);
   }
-
-  useEffect(() => { refresh() }, [])
+  useEffect(() => { refresh(); }, []);
 
   async function onSubmit(e){
-    e.preventDefault()
-    if(!form.name || !form.code) return
-    await createClient(form)
-    setForm({ name: '', code: '' })
-    refresh()
+    e.preventDefault();
+    if(!form.name || !form.code) return;
+    await createClient(form);
+    setForm({ name: '', code: '' });
+    refresh();
   }
 
   return (
     <div>
-      {isAdmin && (<div className="card">
-        <h2>New Client (admin)</h2>
-        <form onSubmit={onSubmit}>
-          <div className="row">
-            <TextField label="Name" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-            <TextField label="Code" value={form.code} onChange={e=>setForm({...form, code:e.target.value})} />
-            <Button variant="contained" type="submit">Create</Button>
-          </div>
-        </form>
-      </div>)}
+      {isAdmin && (
+        <div className="card">
+          <h2>New Client (admin)</h2>
+          <form onSubmit={onSubmit}>
+            <div className="row">
+              <TextField label="Name" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+              <TextField label="Code" value={form.code} onChange={e=>setForm({...form, code:e.target.value})} />
+              <Button variant="contained" type="submit">Create</Button>
+            </div>
+          </form>
+        </div>
+      )}
       <div className="card">
         <h2>Clients</h2>
         <Table>
@@ -42,7 +44,7 @@ export default function ClientsPage(){
           <TableBody>
             {items.map(x => (
               <TableRow key={x._id}>
-                <TableCell>{x.name}</TableCell>
+                <TableCell><Link to={`/clients/${x._id}`}>{x.name}</Link></TableCell>
                 <TableCell>{x.code}</TableCell>
                 <TableCell>{new Date(x.createdAt).toLocaleString()}</TableCell>
               </TableRow>
@@ -51,5 +53,5 @@ export default function ClientsPage(){
         </Table>
       </div>
     </div>
-  )
+  );
 }

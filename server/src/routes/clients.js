@@ -10,7 +10,19 @@ const router = express.Router();
 const clientSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(1),
-  notes: z.string().optional().default('')
+  notes: z.string().optional().default(''),
+
+  addressLine1: z.string().optional().default(''),
+  addressLine2: z.string().optional().default(''),
+  city: z.string().optional().default(''),
+  state: z.string().optional().default(''),
+  postcode: z.string().optional().default(''),
+  country: z.string().optional().default(''),
+
+  contactName: z.string().optional().default(''),
+  phone: z.string().optional().default(''),
+  email: z.string().optional().default(''),
+  website: z.string().optional().default(''),
 });
 
 router.get('/', async (_req, res) => {

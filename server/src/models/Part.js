@@ -11,11 +11,6 @@ const SupplierOptionSchema = new mongoose.Schema({
   preferred: { type: Boolean, default: false },
 }, { _id: false });
 
-const StockBySiteSchema = new mongoose.Schema({
-  site: { type: ObjectId, ref: 'Location', required: true }, // kind='site'
-  qty: { type: Number, default: 0, min: 0 }
-}, { _id: false });
-
 const PartSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   internalSku: { type: String, required: true, trim: true, unique: true },
@@ -23,12 +18,15 @@ const PartSchema = new mongoose.Schema({
   unit: { type: String, default: '', trim: true },
   specs: { type: Object, default: {} },
   notes: { type: String, default: '' },
+
   supplierOptions: { type: [SupplierOptionSchema], default: [] },
+
+  // INTERNAL stock is now a single scalar (no per-site stock)
   internal: {
+    onHand: { type: Number, default: 0, min: 0 },
     standardCost: { type: Number, default: 0 },
     reorderPoint: { type: Number, default: 0 },
-    reorderQty: { type: Number, default: 0 },
-    stockBySite: { type: [StockBySiteSchema], default: [] }
+    reorderQty: { type: Number, default: 0 }
   }
 }, { timestamps: true });
 

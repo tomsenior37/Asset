@@ -14,11 +14,8 @@ import partsRouter from './routes/parts.js';
 import suppliersRouter from './routes/suppliers.js';
 import authRouter from './routes/auth.js';
 import jobsRouter from './routes/jobs.js';
-// add near other imports
+import importsRouter from './routes/imports.js';
 import quickCreateRouter from './routes/quickCreate.js';
-
-// after other app.use(...) lines:
-
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -26,7 +23,7 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/assetdb';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 app.use(cors({ origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN }));
-app.use(express.json({ limit: '8mb' }));
+app.use(express.json({ limit: '16mb' }));
 app.use(morgan('dev'));
 app.use(authOptional);
 
@@ -39,10 +36,12 @@ app.use('/api/assets', assetsRouter);
 app.use('/api/parts', partsRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api', jobsRouter);
+app.use('/api', importsRouter);
+app.use('/api', quickCreateRouter);
 
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-app.use('/api', quickCreateRouter);
+
 mongoose.connect(MONGO_URI, { autoIndex: true }).then(() => {
   console.log('Mongo connected');
   app.listen(PORT, () => console.log(`Server on :${PORT}`));

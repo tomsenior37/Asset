@@ -1,22 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSupplier, updateSupplier, listSupplierParts } from '../services/api';
-import { Tabs, Tab, TextField, Button, Table, TableHead, TableBody, TableCell, TableRow } from '@mui/material';
+import {
+  getSupplier, updateSupplier, listSupplierParts,
+  listParts, linkSupplierToPart, unlinkSupplierFromPart
+} from '../services/api';
+import {
+  Tabs, Tab, TextField, Button, Table, TableHead, TableBody, TableCell, TableRow, Select, MenuItem
+} from '@mui/material';
 import { useAuth } from '../AuthContext.jsx';
 
 export default function SupplierDetailPage(){
   const { id } = useParams();
   const { isAdmin } = useAuth();
   const [s, setS] = useState(null);
-  const [parts, setParts] = useState([]);
   const [tab, setTab] = useState(0);
+
   const [form, setForm] = useState({});
+  const [linkedParts, setLinkedParts] = useState([]);
+
+  // linking form
+  const [query, setQuery] = useState('');
+  const [candidates, setCandidates] = useState([]);
+  const [linkForm, setLinkForm] = useState({
+    partId: '',
+    supplierSku: '',
+    price: 0,
+    currency: 'USD',
+    leadTimeDays: 0,
+    moq: 1,
+    preferred: false
+  });
+
+  async function refreshLinked(){ setLinkedParts(await listSupplierParts(id, { linked: true })); }
 
   useEffect(() => { (async()=>{
-    const _s = await getSupplier(id);
-    setS(_s);
-    setForm(_s);
-    setParts(await listSupplierParts(id));
+    const sup = await getSupplier(id);
+    setS(sup); setForm(sup);
+    await refreshLinked();
   })(); }, [id]);
 
   async function save(){
@@ -32,6 +52,31 @@ export default function SupplierDetailPage(){
     const out = await updateSupplier(id, payload);
     setS(out);
     setForm(out);
+  }
+
+  async function searchUnlinked(q){
+    setQuery(q);
+    if (!q || q.length < 2) { setCandidates([]); return; }
+    const res = await listParts({ q });
+    // filter out parts already linked to this supplier
+    const lp = await listSupplierParts(id, { linked: true });
+    const linkedIds = new Set(lp.map(p => String(p._id)));
+    const filtered = (res.items || []).filter(p => !linkedIds.has(String(p._id)));
+    setCandidates(filtered);
+  }
+
+  async function doLink(){
+    if (!linkForm.partId) return;
+    await linkSupplierToPart(id, linkForm);
+    // reset and refresh
+    setLinkForm({ partId:'', supplierSku:'', price:0, currency:'USD', leadTimeDays:0, moq:1, preferred:false });
+    setCandidates([]); setQuery('');
+    await refreshLinked();
+  }
+
+  async function doUnlink(partId){
+    await unlinkSupplierFromPart(id, partId);
+    await refreshLinked();
   }
 
   if(!s) return <div className="card"><p>Loading…</p></div>;
@@ -64,26 +109,53 @@ export default function SupplierDetailPage(){
       {tab===1 && (
         <div className="card">
           <h3>Linked Parts</h3>
-          {!parts.length && <p><em>No parts reference this supplier yet.</em></p>}
-          {!!parts.length && (
+          {!linkedParts.length && <p><em>No parts reference this supplier yet.</em></p>}
+          {!!linkedParts.length && (
             <Table>
               <TableHead>
                 <TableRow>
                   <TableCell>SKU</TableCell>
                   <TableCell>Name</TableCell>
                   <TableCell>Category</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {parts.map(p => (
+                {linkedParts.map(p => (
                   <TableRow key={p._id}>
                     <TableCell>{p.internalSku}</TableCell>
                     <TableCell><Link to={`/parts/${p._id}`}>{p.name}</Link></TableCell>
                     <TableCell>{p.category}</TableCell>
+                    <TableCell>
+                      {isAdmin && <Button size="small" color="error" variant="outlined" onClick={()=>doUnlink(p._id)}>Unlink</Button>}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {isAdmin && (
+            <>
+              <h3 style={{marginTop:20}}>Link a new Part</h3>
+              <div className="row" style={{alignItems:'flex-end'}}>
+                <TextField label="Search parts…" value={query} onChange={e=>searchUnlinked(e.target.value)} />
+                <Select displayEmpty value={linkForm.partId} onChange={e=>setLinkForm({...linkForm, partId:e.target.value})} style={{minWidth:280}}>
+                  <MenuItem value=""><em>Pick part…</em></MenuItem>
+                  {candidates.map(p => <MenuItem key={p._id} value={p._id}>{p.internalSku} — {p.name}</MenuItem>)}
+                </Select>
+                <TextField label="Supplier SKU" value={linkForm.supplierSku} onChange={e=>setLinkForm({...linkForm, supplierSku:e.target.value})}/>
+                <TextField label="Price" type="number" value={linkForm.price} onChange={e=>setLinkForm({...linkForm, price:Number(e.target.value)})}/>
+                <TextField label="Currency" value={linkForm.currency} onChange={e=>setLinkForm({...linkForm, currency:e.target.value})}/>
+                <TextField label="Lead (days)" type="number" value={linkForm.leadTimeDays} onChange={e=>setLinkForm({...linkForm, leadTimeDays:Number(e.target.value)})}/>
+                <TextField label="MOQ" type="number" value={linkForm.moq} onChange={e=>setLinkForm({...linkForm, moq:Number(e.target.value)})}/>
+                <Select value={linkForm.preferred ? 'yes' : 'no'} onChange={e=>setLinkForm({...linkForm, preferred: e.target.value === 'yes'})}>
+                  <MenuItem value="no">no</MenuItem>
+                  <MenuItem value="yes">yes</MenuItem>
+                </Select>
+                <Button variant="contained" onClick={doLink}>Link</Button>
+              </div>
+            </>
           )}
         </div>
       )}

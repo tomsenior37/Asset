@@ -9,6 +9,7 @@ import AssetDetailPage from './pages/AssetDetailPage.jsx';
 import PartsPage from './pages/PartsPage.jsx';
 import PartDetailPage from './pages/PartDetailPage.jsx';
 import SuppliersPage from './pages/SuppliersPage.jsx';
+import SupplierDetailPage from './pages/SupplierDetailPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import './styles.css';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
@@ -48,6 +49,7 @@ function Layout() {
           <Route path="/parts" element={<PartsPage />} />
           <Route path="/parts/:id" element={<PartDetailPage />} />
           <Route path="/suppliers" element={<SuppliersPage />} />
+          <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
         </Routes>
       </main>

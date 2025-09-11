@@ -1,36 +1,37 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 
-import ClientsPage from './pages/ClientsPage.jsx';
-import ClientDetailPage from './pages/ClientDetailPage.jsx';
-import LocationsPage from './pages/LocationsPage.jsx';
+import ClientsPage from './pages/ClientsPage.jsx'
+import ClientDetailPage from './pages/ClientDetailPage.jsx'
+import LocationsPage from './pages/LocationsPage.jsx'
+import LocationDetailPage from './pages/LocationDetailPage.jsx'
 
-import AssetsPage from './pages/AssetsPage.jsx';
-import AssetDetailPage from './pages/AssetDetailPage.jsx';
+import AssetsPage from './pages/AssetsPage.jsx'
+import AssetDetailPage from './pages/AssetDetailPage.jsx'
 
-import PartsPage from './pages/PartsPage.jsx';
-import PartDetailPage from './pages/PartDetailPage.jsx';
+import PartsPage from './pages/PartsPage.jsx'
+import PartDetailPage from './pages/PartDetailPage.jsx'
 
-import SuppliersPage from './pages/SuppliersPage.jsx';
-import SupplierDetailPage from './pages/SupplierDetailPage.jsx';
+import SuppliersPage from './pages/SuppliersPage.jsx'
+import SupplierDetailPage from './pages/SupplierDetailPage.jsx'
 
-import JobsPage from './pages/JobsPage.jsx';
-import JobDetailPage from './pages/JobDetailPage.jsx';
+import JobsPage from './pages/JobsPage.jsx'
+import JobDetailPage from './pages/JobDetailPage.jsx'
 
-import LoginPage from './pages/LoginPage.jsx';
+import LoginPage from './pages/LoginPage.jsx'
 
-import './styles.css';
-import { AuthProvider, useAuth } from './AuthContext.jsx';
+import './styles.css'
+import { AuthProvider, useAuth } from './AuthContext.jsx'
 
 function RoleBadge(){
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth()
   return (
     <div style={{display:'flex',gap:8,alignItems:'center'}}>
       <span>{user ? (isAdmin ? 'Admin' : 'User') : 'Guest'}</span>
       {user && <button onClick={logout}>Logout</button>}
     </div>
-  );
+  )
 }
 
 function Layout() {
@@ -55,6 +56,7 @@ function Layout() {
           <Route path="/clients/:id" element={<ClientDetailPage />} />
 
           <Route path="/locations" element={<LocationsPage />} />
+          <Route path="/locations/:id" element={<LocationDetailPage />} />
 
           <Route path="/assets" element={<AssetsPage />} />
           <Route path="/assets/:id" element={<AssetDetailPage />} />
@@ -72,7 +74,7 @@ function Layout() {
         </Routes>
       </main>
     </div>
-  );
+  )
 }
 
 createRoot(document.getElementById('root')).render(
@@ -81,4 +83,4 @@ createRoot(document.getElementById('root')).render(
       <Layout />
     </AuthProvider>
   </BrowserRouter>
-);
+)

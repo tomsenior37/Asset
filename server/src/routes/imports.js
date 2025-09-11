@@ -38,7 +38,8 @@ const TEMPLATES = {
   ]
 };
 
-router.get('/imports/template/:type', requireAuth, (req, res) => {
+/* PUBLIC: allow direct browser download without auth */
+router.get('/imports/template/:type', (req, res) => {
   const type = String(req.params.type || '').toLowerCase();
   if (!TEMPLATES[type]) return res.status(400).json({ error: 'Unknown template type' });
   res.setHeader('Content-Type', 'text/csv');
@@ -68,10 +69,6 @@ async function clientByCode(code){ return code ? Client.findOne({ code: String(c
 async function locByCode(clientId, code){ return (clientId && code) ? Location.findOne({ client: clientId, code }).lean() : null; }
 
 /* ------------------------- IMPORT/VALIDATE HANDLERS ------------------------ */
-// Each handler returns { rows: [ { rowIndex, ok, action, message } ], summary: {...} }
-// If dryRun=false it performs upserts and sets action='insert'|'update'
-// If dryRun=true it only validates and sets action='validate'
-
 async function importClients(rows, dryRun){
   const details=[]; let inserted=0, updated=0, errors=0;
   for (let i=0;i<rows.length;i++){

@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  getJob, updateJobGlobal, addJobResource, updateJobResource, deleteJobResource
+  getJob, updateJobGlobal,
+  addJobResource, updateJobResource, deleteJobResource,
+  listJobAttachments, uploadJobAttachment, deleteJobAttachment
 } from '../services/api';
 import {
-  Tabs, Tab, TextField, Select, MenuItem, Button, Table, TableHead, TableRow, TableCell, TableBody
+  Tabs, Tab, TextField, Select, MenuItem, Button,
+  Table, TableHead, TableRow, TableCell, TableBody
 } from '@mui/material';
 
 const STATUS_LABELS = {
@@ -24,17 +27,28 @@ export default function JobDetailPage(){
   const [tab, setTab] = useState(0);
   const [job, setJob] = useState(null);
   const [statuses, setStatuses] = useState([]);
-  const [form, setForm] = useState({});
+
+  const [form, setForm] = useState({
+    jobNumber:'', poNumber:'', title:'', description:'', startDate:'', quoteDueDate:'', status:'investigate_quote'
+  });
+
   const [resForm, setResForm] = useState({ person:'', role:'', hours:0, date:'', notes:'' });
+  const [files, setFiles] = useState([]);
+  const [newFileKind, setNewFileKind] = useState('rcs');
+
+  const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 
   async function load(){
     const { job: j, statuses: st } = await getJob(id);
     setJob(j); setStatuses(st);
     setForm({
       jobNumber: j.jobNumber, poNumber: j.poNumber, title: j.title,
-      description: j.description, startDate: j.startDate ? j.startDate.slice(0,10) : '',
+      description: j.description,
+      startDate: j.startDate ? j.startDate.slice(0,10) : '',
+      quoteDueDate: j.quoteDueDate ? j.quoteDueDate.slice(0,10) : '',
       status: j.status
     });
+    setFiles(await listJobAttachments(id));
   }
   useEffect(()=>{ load(); }, [id]);
 
@@ -42,7 +56,7 @@ export default function JobDetailPage(){
     const payload = {
       jobNumber: form.jobNumber, poNumber: form.poNumber, title: form.title,
       description: form.description, status: form.status,
-      startDate: form.startDate || null
+      startDate: form.startDate || null, quoteDueDate: form.quoteDueDate || null
     };
     const updated = await updateJobGlobal(id, payload);
     setJob(updated);
@@ -62,10 +76,51 @@ export default function JobDetailPage(){
     const updated = await updateJobResource(id, rid, patch);
     setJob(updated);
   }
-
   async function removeResource(rid){
     const updated = await deleteJobResource(id, rid);
     setJob(updated);
+  }
+
+  async function upload(kind, file){
+    if(!file) return;
+    await uploadJobAttachment(id, file, kind);
+    setFiles(await listJobAttachments(id));
+  }
+  async function removeFile(filename){
+    await deleteJobAttachment(id, filename);
+    setFiles(await listJobAttachments(id));
+  }
+
+  function section(label, kind){
+    const items = files.filter(f => f.kind === kind);
+    return (
+      <div className="card">
+        <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
+          <h3 style={{margin:0}}>{label}</h3>
+          <div className="row">
+            <input type="file" onChange={e=>upload(kind, e.target.files?.[0])}/>
+          </div>
+        </div>
+        {!items.length ? <p><em>No files.</em></p> : (
+          <Table>
+            <TableHead><TableRow><TableCell>Name</TableCell><TableCell>Type</TableCell><TableCell>Size</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
+            <TableBody>
+              {items.map(f => {
+                const url = `${apiBase}/uploads/jobs/${id}/${f.filename}`;
+                return (
+                  <TableRow key={f.filename}>
+                    <TableCell><a href={url} target="_blank" rel="noreferrer">{f.originalname || f.filename}</a></TableCell>
+                    <TableCell>{f.mimetype}</TableCell>
+                    <TableCell>{(f.size/1024).toFixed(1)} KB</TableCell>
+                    <TableCell><Button size="small" color="error" variant="outlined" onClick={()=>removeFile(f.filename)}>Delete</Button></TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    );
   }
 
   if(!job) return <div className="card"><p>Loading…</p></div>;
@@ -86,6 +141,7 @@ export default function JobDetailPage(){
       <Tabs value={tab} onChange={(_,v)=>setTab(v)} sx={{mb:1}}>
         <Tab label="Overview" />
         <Tab label="Resources" />
+        <Tab label="Documents" />
       </Tabs>
 
       {tab===0 && (
@@ -97,6 +153,7 @@ export default function JobDetailPage(){
               {statuses.map(s => <MenuItem key={s} value={s}>{STATUS_LABELS[s]}</MenuItem>)}
             </Select>
             <TextField label="Start date" type="date" InputLabelProps={{shrink:true}} value={form.startDate||''} onChange={e=>setForm({...form, startDate:e.target.value})}/>
+            <TextField label="Quote due date" type="date" InputLabelProps={{shrink:true}} value={form.quoteDueDate||''} onChange={e=>setForm({...form, quoteDueDate:e.target.value})}/>
           </div>
           <TextField label="Title" fullWidth value={form.title||''} onChange={e=>setForm({...form, title:e.target.value})}/>
           <TextField label="Description of work" fullWidth multiline minRows={4} value={form.description||''} onChange={e=>setForm({...form, description:e.target.value})}/>
@@ -150,6 +207,15 @@ export default function JobDetailPage(){
             </Table>
           )}
         </div>
+      )}
+
+      {tab===2 && (
+        <>
+          {section('RCS (original request)', 'rcs')}
+          {section('Correspondence (emails, notes, PDFs)', 'correspondence')}
+          {section('Supplier Quotes', 'supplier_quote')}
+          {section('Other', 'other')}
+        </>
       )}
     </div>
   );

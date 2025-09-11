@@ -1,28 +1,27 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+
 import ClientsPage from './pages/ClientsPage.jsx';
 import ClientDetailPage from './pages/ClientDetailPage.jsx';
 import LocationsPage from './pages/LocationsPage.jsx';
+
 import AssetsPage from './pages/AssetsPage.jsx';
 import AssetDetailPage from './pages/AssetDetailPage.jsx';
+
 import PartsPage from './pages/PartsPage.jsx';
 import PartDetailPage from './pages/PartDetailPage.jsx';
+
 import SuppliersPage from './pages/SuppliersPage.jsx';
 import SupplierDetailPage from './pages/SupplierDetailPage.jsx';
-import LoginPage from './pages/LoginPage.jsx';
-import './styles.css';
-import { AuthProvider, useAuth } from './AuthContext.jsx';
-// ...existing imports...
+
 import JobsPage from './pages/JobsPage.jsx';
 import JobDetailPage from './pages/JobDetailPage.jsx';
 
-// inside <nav> add:
-<NavLink to="/jobs">Jobs</NavLink>
+import LoginPage from './pages/LoginPage.jsx';
 
-// inside <Routes> add:
-<Route path="/jobs" element={<JobsPage />} />
-<Route path="/jobs/:id" element={<JobDetailPage />} />
+import './styles.css';
+import { AuthProvider, useAuth } from './AuthContext.jsx';
 
 function RoleBadge(){
   const { user, isAdmin, logout } = useAuth();
@@ -45,6 +44,7 @@ function Layout() {
           <NavLink to="/assets">Assets</NavLink>
           <NavLink to="/parts">Parts</NavLink>
           <NavLink to="/suppliers">Suppliers</NavLink>
+          <NavLink to="/jobs">Jobs</NavLink>
           <NavLink to="/login">Login</NavLink>
         </nav>
         <RoleBadge />
@@ -53,13 +53,21 @@ function Layout() {
         <Routes>
           <Route path="/" element={<ClientsPage />} />
           <Route path="/clients/:id" element={<ClientDetailPage />} />
+
           <Route path="/locations" element={<LocationsPage />} />
+
           <Route path="/assets" element={<AssetsPage />} />
           <Route path="/assets/:id" element={<AssetDetailPage />} />
+
           <Route path="/parts" element={<PartsPage />} />
           <Route path="/parts/:id" element={<PartDetailPage />} />
+
           <Route path="/suppliers" element={<SuppliersPage />} />
           <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
+
+          <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/jobs/:id" element={<JobDetailPage />} />
+
           <Route path="/login" element={<LoginPage />} />
         </Routes>
       </main>

@@ -14,7 +14,7 @@ const TYPES = [
 export default function DataImportPage(){
   const [type, setType] = useState('clients');
   const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null); // { template, rows:[{rowIndex,ok,action,message}], summary:{} }
+  const [preview, setPreview] = useState(null);
   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 
   function templateUrl(){ return `${apiBase}/api/imports/template/${type}`; }
@@ -37,9 +37,7 @@ export default function DataImportPage(){
     const keys = Object.keys(summary);
     return (
       <div style={{display:'flex', gap:12, flexWrap:'wrap', margin:'8px 0'}}>
-        {keys.map(k => (
-          <Chip key={k} label={`${k}: ${summary[k]}`} />
-        ))}
+        {keys.map(k => (<Chip key={k} label={`${k}: ${summary[k]}`} />))}
       </div>
     );
   }
@@ -48,11 +46,12 @@ export default function DataImportPage(){
     <div>
       <div className="card">
         <h2>Data Import</h2>
-        <p>Pick a type, download its CSV template, then upload for a dry-run preview. If everything looks good, click Import.</p>
+        <p>Pick a type, download its CSV template, run a dry-run preview, then Import.</p>
         <div className="row" style={{gap:12, flexWrap:'wrap'}}>
           <Select value={type} onChange={e=>{ setType(e.target.value); setPreview(null); setFile(null); }}>
             {TYPES.map(t => <MenuItem key={t.v} value={t.v}>{t.label}</MenuItem>)}
           </Select>
+
           <a href={templateUrl()} target="_blank" rel="noreferrer">
             <Button variant="outlined">Download template</Button>
           </a>
@@ -99,16 +98,6 @@ export default function DataImportPage(){
             </Table>
           </>
         )}
-      </div>
-
-      <div className="card">
-        <h3>Notes</h3>
-        <ul style={{marginTop:0}}>
-          <li>“Validate (dry-run)” checks references (e.g., <em>client_code</em>, <em>location_code</em>) and required fields without writing.</li>
-          <li>“Import” performs upserts; existing rows update, new rows insert.</li>
-          <li>For **Locations**: <em>site</em> rows have no parent; <em>area</em> rows require a valid <em>parent_code</em> (site).</li>
-          <li>For **Jobs**: <em>status</em> is validated; unknown values default to <em>investigate_quote</em>.</li>
-        </ul>
       </div>
     </div>
   );

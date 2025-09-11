@@ -21,6 +21,7 @@ import SupplierDetailPage from './pages/SupplierDetailPage.jsx'
 import JobsPage from './pages/JobsPage.jsx'
 import JobDetailPage from './pages/JobDetailPage.jsx'
 
+import DataImportPage from './pages/DataImportPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 
 import './styles.css'
@@ -48,6 +49,7 @@ function Layout() {
           <NavLink to="/parts">Parts</NavLink>
           <NavLink to="/suppliers">Suppliers</NavLink>
           <NavLink to="/jobs">Jobs</NavLink>
+          <NavLink to="/import">Import</NavLink>
           <NavLink to="/login">Login</NavLink>
         </nav>
         <RoleBadge />
@@ -73,6 +75,8 @@ function Layout() {
 
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/jobs/:id" element={<JobDetailPage />} />
+
+          <Route path="/import" element={<DataImportPage />} />
 
           <Route path="/login" element={<LoginPage />} />
         </Routes>

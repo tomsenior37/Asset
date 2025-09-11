@@ -1,25 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { listClients, getLocationTree, createLocation } from '../services/api'
-import { TextField, Button, Select, MenuItem } from '@mui/material'
-
-function Node({ node }){
-  return (
-    <li>
-      <strong>{node.name}</strong> <em>({node.code})</em> <small>{node.kind}</small>
-      {node.children && node.children.length ? (
-        <ul>{node.children.map(c => <Node key={c._id} node={c} />)}</ul>
-      ) : null}
-    </li>
-  )
-}
+import { listClients, getLocationTree } from '../services/api'
+import { Table, TableBody, TableCell, TableHead, TableRow, Select, MenuItem, TextField, Button } from '@mui/material'
+import { Link } from 'react-router-dom'
 
 export default function LocationsPage(){
   const [clients, setClients] = useState([])
   const [clientId, setClientId] = useState('')
-  const [tree, setTree] = useState([])
-
-  const [form, setForm] = useState({ name: '', code: '', kind: 'site', parent: '' })
-  const [flat, setFlat] = useState([])
+  const [rows, setRows] = useState([])
+  const [q, setQ] = useState('')
 
   useEffect(() => {
     (async () => {
@@ -29,86 +17,77 @@ export default function LocationsPage(){
     })()
   }, [])
 
-  async function loadTree(cid){
-    const t = await getLocationTree(cid)
-    setTree(t)
-    const flatList = []
-    const walk = (n, depth=0) => {
-      flatList.push({ _id: n._id, kind: n.kind, label: '—'.repeat(depth) + n.name })
-      n.children?.forEach(c => walk(c, depth+1))
+  async function loadFlat(cid){
+    const tree = await getLocationTree(cid)
+    const out = []
+    const index = new Map()
+    // build map
+    const walk = (n, parent=null) => {
+      index.set(n._id, { ...n, parent })
+      n.children?.forEach(c => walk(c, n))
     }
-    t.forEach(r => walk(r, 0))
-    setFlat(flatList)
+    tree.forEach(r => walk(r, null))
+
+    // flatten with parent name & kind
+    for (const [id, node] of index) {
+      const parent = node.parent
+      out.push({
+        id,
+        code: node.code,
+        name: node.name,
+        kind: node.kind,
+        clientName: clients.find(c=>c._id===cid)?.name || '',
+        parentName: parent ? parent.name : '(root)',
+      })
+    }
+    setRows(out.sort((a,b)=>a.name.localeCompare(b.name)))
   }
 
-  useEffect(() => { if (clientId) loadTree(clientId) }, [clientId])
+  useEffect(() => { if (clientId) loadFlat(clientId) }, [clientId, clients])
 
-  async function onCreate(e){
-    e.preventDefault()
-    await createLocation(clientId, form.parent ? { ...form } : { ...form, parent: null })
-    setForm({ name: '', code: '', kind: 'site', parent: '' })
-    loadTree(clientId)
-  }
+  const filtered = rows.filter(r =>
+    (q ? (r.name.toLowerCase().includes(q.toLowerCase()) || r.code.toLowerCase().includes(q.toLowerCase())) : true)
+  )
 
   return (
     <div>
       <div className="card">
-        <h2>Pick Client</h2>
-        <Select value={clientId} onChange={e=>setClientId(e.target.value)}>
-          {clients.map(c => <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>)}
-        </Select>
-      </div>
-
-      <div className="card">
-        <h2>New Location</h2>
-        <form onSubmit={onCreate}>
-          <div className="row">
-            <TextField label="Name" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-            <TextField label="Code" value={form.code} onChange={e=>setForm({...form, code:e.target.value})} />
-            <Select value={form.kind} onChange={e=>setForm({...form, kind:e.target.value})}>
-              <MenuItem value="site">site</MenuItem>
-              <MenuItem value="area">area</MenuItem>
-            </Select>
-            <Select value={form.parent} onChange={e=>setForm({...form, parent:e.target.value})}>
-              <MenuItem value="">(no parent)</MenuItem>
-              {flat.map(x => <MenuItem key={x._id} value={x._id}>{x.label}</MenuItem>)}
-            </Select>
-            <Button variant="contained" type="submit">Create</Button>
-          </div>
-        </form>
-      </div>
-
-      <div className="card">
-        <h2>Move Subtree</h2>
-        <div className="row">
-          <Select displayEmpty value={form.moveTarget || ''} onChange={e=>setForm({...form, moveTarget:e.target.value})}>
-            <MenuItem value="">Pick location to move</MenuItem>
-            {flat.map(x => <MenuItem key={x._id} value={x._id}>{x.label}</MenuItem>)}
+        <h2>Locations</h2>
+        <div className="row" style={{flexWrap:'wrap', gap:12}}>
+          <Select value={clientId} onChange={e=>setClientId(e.target.value)}>
+            {clients.map(c => <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>)}
           </Select>
-          <Select displayEmpty value={form.newParent || ''} onChange={e=>setForm({...form, newParent:e.target.value})}>
-            <MenuItem value="">(Root for sites only)</MenuItem>
-            {flat.filter(x=>x.kind==='site').map(x => <MenuItem key={x._id} value={x._id}>{x.label}</MenuItem>)}
-          </Select>
-          <Button variant="contained" onClick={async ()=>{
-            if(!form.moveTarget) return alert('Pick a location')
-            const id = form.moveTarget
-            const newParent = form.newParent || null
-            const res = await fetch((import.meta.env.VITE_API_BASE || 'http://localhost:4000') + '/api/locations/' + id + '/move-subtree', {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('assetdb_token')||'') },
-              body: JSON.stringify({ newParent })
-            })
-            const json = await res.json()
-            if(!res.ok){ alert(json.error || 'Move failed') } else { alert('Moved'); loadTree(clientId) }
-          }}>Move</Button>
+          <TextField label="Search name/code" value={q} onChange={e=>setQ(e.target.value)} />
+          <Button variant="outlined" onClick={()=>loadFlat(clientId)}>Refresh</Button>
         </div>
       </div>
 
       <div className="card">
-        <h2>Tree</h2>
-        <ul>
-          {tree.map(n => <Node key={n._id} node={n} />)}
-        </ul>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Client</TableCell>
+              <TableCell>Parent</TableCell>
+              <TableCell>Kind</TableCell>
+              <TableCell>Code</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Open</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filtered.map(r => (
+              <TableRow key={r.id}>
+                <TableCell>{r.clientName}</TableCell>
+                <TableCell>{r.parentName}</TableCell>
+                <TableCell>{r.kind}</TableCell>
+                <TableCell>{r.code}</TableCell>
+                <TableCell>{r.name}</TableCell>
+                <TableCell><Link to={`/locations/${r.id}`}><Button variant="outlined">Assets</Button></Link></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!filtered.length && <p><em>No locations.</em></p>}
       </div>
     </div>
   )

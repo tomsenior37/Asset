@@ -12,8 +12,8 @@ import locationsRouter from './routes/locations.js';
 import assetsRouter from './routes/assets.js';
 import partsRouter from './routes/parts.js';
 import suppliersRouter from './routes/suppliers.js';
-import bomTemplatesRouter from './routes/bomTemplates.js';
 import authRouter from './routes/auth.js';
+import jobsRouter from './routes/jobs.js'; // <-- NEW
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -33,10 +33,12 @@ app.use('/api', locationsRouter);
 app.use('/api/assets', assetsRouter);
 app.use('/api/parts', partsRouter);
 app.use('/api/suppliers', suppliersRouter);
-app.use('/api/bom-templates', bomTemplatesRouter);
+app.use('/api', jobsRouter); // <-- NEW
 
+// uploads
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
+// 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
 mongoose

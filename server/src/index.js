@@ -14,6 +14,11 @@ import partsRouter from './routes/parts.js';
 import suppliersRouter from './routes/suppliers.js';
 import authRouter from './routes/auth.js';
 import jobsRouter from './routes/jobs.js';
+// add near other imports
+import quickCreateRouter from './routes/quickCreate.js';
+
+// after other app.use(...) lines:
+
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -37,7 +42,7 @@ app.use('/api', jobsRouter);
 
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-
+app.use('/api', quickCreateRouter);
 mongoose.connect(MONGO_URI, { autoIndex: true }).then(() => {
   console.log('Mongo connected');
   app.listen(PORT, () => console.log(`Server on :${PORT}`));

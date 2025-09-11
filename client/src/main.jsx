@@ -13,6 +13,16 @@ import SupplierDetailPage from './pages/SupplierDetailPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import './styles.css';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
+// ...existing imports...
+import JobsPage from './pages/JobsPage.jsx';
+import JobDetailPage from './pages/JobDetailPage.jsx';
+
+// inside <nav> add:
+<NavLink to="/jobs">Jobs</NavLink>
+
+// inside <Routes> add:
+<Route path="/jobs" element={<JobsPage />} />
+<Route path="/jobs/:id" element={<JobDetailPage />} />
 
 function RoleBadge(){
   const { user, isAdmin, logout } = useAuth();

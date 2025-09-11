@@ -1,24 +1,53 @@
 import mongoose from 'mongoose';
 const { ObjectId } = mongoose.Schema.Types;
 
+const ResourceSchema = new mongoose.Schema(
+  {
+    person: { type: String, required: true, trim: true },
+    role:   { type: String, default: '', trim: true },
+    hours:  { type: Number, default: 0, min: 0 },
+    date:   { type: Date, default: null },
+    notes:  { type: String, default: '' }
+  },
+  { _id: true, timestamps: true }
+);
+
+const statuses = [
+  'investigate_quote',
+  'quoted',
+  'po_received',
+  'awaiting_parts',
+  'parts_received',
+  'require_plan_date',
+  'planned',
+  'in_progress',
+  'invoice'
+];
+
 const JobSchema = new mongoose.Schema(
   {
-    asset: { type: ObjectId, ref: 'Asset', required: true, index: true },
-    client: { type: ObjectId, ref: 'Client', required: true, index: true },
+    jobNumber: { type: String, required: true, trim: true, unique: true, index: true },
+    poNumber:  { type: String, default: '', trim: true, index: true },
+
+    client:   { type: ObjectId, ref: 'Client', required: true, index: true },
+    location: { type: ObjectId, ref: 'Location', default: null, index: true },
+    asset:    { type: ObjectId, ref: 'Asset', default: null, index: true },
 
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
 
-    status: { type: String, enum: ['open', 'in_progress', 'done', 'cancelled'], default: 'open', index: true },
-    priority: { type: String, enum: ['low', 'normal', 'high', 'urgent'], default: 'normal', index: true },
+    startDate: { type: Date, default: null },
 
-    dueDate: { type: Date, default: null },
+    status: { type: String, enum: statuses, default: 'investigate_quote', index: true },
 
-    // lightweight assignee/creator (text for now; can switch to User ref later)
-    assignee: { type: String, default: '' },
-    createdBy: { type: String, default: '' }
+    resources: { type: [ResourceSchema], default: [] }
   },
   { timestamps: true }
 );
 
+JobSchema.index({ jobNumber: 1 });
+JobSchema.index({ poNumber: 1 });
+JobSchema.index({ title: 'text', description: 'text' });
+
+export const JOB_STATUSES = statuses;
 export default mongoose.model('Job', JobSchema);

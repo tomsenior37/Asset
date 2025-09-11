@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  listJobsGlobal, createJobGlobal, listClients, getLocationTree, listAssets, createAssetQuick
+  listJobsGlobal, createJobGlobal, listClients, getLocationTree,
+  listAssets, createAssetQuick
 } from '../services/api';
 import {
   Table, TableHead, TableRow, TableCell, TableBody,
@@ -20,12 +21,15 @@ const STATUS_LABELS = {
   invoice: 'Invoice'
 };
 
+const CREATE_ASSET_VALUE = '__create_asset__';
+
 export default function JobsPage(){
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [clients, setClients] = useState([]);
   const [clientId, setClientId] = useState('');
   const [locations, setLocations] = useState([]);
+  const [assets, setAssets] = useState([]);
   const [data, setData] = useState({ items: [], total: 0, page: 1, pages: 1, statuses: [] });
 
   const [newJob, setNewJob] = useState({
@@ -36,7 +40,7 @@ export default function JobsPage(){
     status: 'investigate_quote'
   });
 
-  // inline asset modal
+  // inline asset modal state
   const [assetModal, setAssetModal] = useState(false);
   const [assetForm, setAssetForm] = useState({ name:'', tag:'', category:'', model:'', serial:'', notes:'' });
 
@@ -45,20 +49,39 @@ export default function JobsPage(){
     setData(out);
   }
 
+  // initial clients
   useEffect(() => { (async()=>{
     const cs = await listClients(); setClients(cs);
     if (cs.length) setClientId(cs[0]._id);
   })(); }, []);
 
+  // when client changes, load locations and jobs
   useEffect(() => { (async()=>{
     if (!clientId) return;
+    // locations
     const tree = await getLocationTree(clientId);
     const flat = [];
     const walk = (n, depth=0) => { flat.push({ _id:n._id, label: '—'.repeat(depth)+n.name }); (n.children||[]).forEach(c=>walk(c, depth+1)); };
     tree.forEach(r=>walk(r));
     setLocations(flat);
+
+    // clear asset selection when client changes
+    setNewJob(j => ({ ...j, asset: '' }));
+
+    // refresh list
     refresh(1);
   })(); }, [clientId, q, status]);
+
+  // when location changes, load assets for that location
+  useEffect(() => { (async()=>{
+    if (!clientId || !newJob.location) { setAssets([]); return; }
+    const res = await listAssets({ client: clientId, location: newJob.location, limit: 500 });
+    setAssets(res.items || []);
+    // if current selected asset doesn't belong anymore, clear it
+    if (newJob.asset && !(res.items || []).some(a => a._id === newJob.asset)) {
+      setNewJob(j => ({ ...j, asset: '' }));
+    }
+  })(); }, [clientId, newJob.location]);
 
   async function onCreate(e){
     e.preventDefault();
@@ -71,17 +94,29 @@ export default function JobsPage(){
       quoteDueDate: newJob.quoteDueDate || null
     };
     await createJobGlobal(payload);
-    setNewJob({ jobNumber:'', poNumber:'', location:'', asset:'', title:'', description:'', startDate:'', quoteDueDate:'', status:'investigate_quote' });
+    setNewJob({
+      jobNumber:'', poNumber:'', location:'', asset:'',
+      title:'', description:'', startDate:'', quoteDueDate:'', status:'investigate_quote'
+    });
+    setAssets([]);
     refresh(1);
   }
 
-  async function openAssetModal(){
-    if (!clientId || !newJob.location){
-      alert('Pick Client and Location first.');
+  function onLocationChange(val){
+    setNewJob({ ...newJob, location: val, asset: '' });
+  }
+
+  function onAssetSelect(val){
+    if (val === CREATE_ASSET_VALUE) {
+      // open inline asset modal (requires client + location)
+      if (!clientId || !newJob.location) {
+        alert('Pick Client and Location first.'); return;
+      }
+      setAssetForm({ name:'', tag:'', category:'', model:'', serial:'', notes:'' });
+      setAssetModal(true);
       return;
     }
-    setAssetForm({ name:'', tag:'', category:'', model:'', serial:'', notes:'' });
-    setAssetModal(true);
+    setNewJob({ ...newJob, asset: val });
   }
 
   async function createAssetInline(){
@@ -97,8 +132,10 @@ export default function JobsPage(){
       notes: assetForm.notes || ''
     };
     const made = await createAssetQuick(payload);
-    // assign new asset to job form
-    setNewJob({...newJob, asset: made._id});
+    // refresh asset list and select the new one
+    const res = await listAssets({ client: clientId, location: newJob.location, limit: 500 });
+    setAssets(res.items || []);
+    setNewJob(j => ({ ...j, asset: made._id }));
     setAssetModal(false);
   }
 
@@ -128,13 +165,21 @@ export default function JobsPage(){
             <TextField label="Job Number (5 digits)" value={newJob.jobNumber} onChange={e=>setNewJob({...newJob, jobNumber:e.target.value})}/>
             <TextField label="PO Number" value={newJob.poNumber} onChange={e=>setNewJob({...newJob, poNumber:e.target.value})}/>
 
-            <Select displayEmpty value={newJob.location} onChange={e=>setNewJob({...newJob, location:e.target.value})} style={{minWidth:280}}>
+            <Select displayEmpty value={newJob.location} onChange={e=>onLocationChange(e.target.value)} style={{minWidth:280}}>
               <MenuItem value=""><em>(No location)</em></MenuItem>
               {locations.map(l => <MenuItem key={l._id} value={l._id}>{l.label}</MenuItem>)}
             </Select>
 
-            <TextField label="Asset ID (optional)" value={newJob.asset} onChange={e=>setNewJob({...newJob, asset:e.target.value})}/>
-            <Button type="button" variant="outlined" onClick={openAssetModal}>Create Asset</Button>
+            {/* Location-bound assets */}
+            <Select displayEmpty value={newJob.asset} onChange={e=>onAssetSelect(e.target.value)} style={{minWidth:320}}>
+              <MenuItem value=""><em>(No asset)</em></MenuItem>
+              {assets.map(a => (
+                <MenuItem key={a._id} value={a._id}>
+                  {a.name}{a.tag ? ` — ${a.tag}` : ''}{a.model ? ` — ${a.model}` : ''}
+                </MenuItem>
+              ))}
+              <MenuItem value={CREATE_ASSET_VALUE}><em>+ Create Asset…</em></MenuItem>
+            </Select>
 
             <TextField label="Title" value={newJob.title} onChange={e=>setNewJob({...newJob, title:e.target.value})}/>
             <TextField label="Start date (from RCS)" type="date" InputLabelProps={{shrink:true}} value={newJob.startDate} onChange={e=>setNewJob({...newJob, startDate:e.target.value})}/>

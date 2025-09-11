@@ -46,14 +46,76 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   res.json({ ok: true });
 });
 
-/** NEW: list parts that reference this supplier in supplierOptions */
+/** List parts referencing (linked=true) or not referencing (linked=false) this supplier */
 router.get('/:id/parts', async (req, res) => {
   const supplierId = req.params.id;
-  const parts = await Part.find({ 'supplierOptions.supplier': supplierId })
-    .select('internalSku name category unit supplierOptions')
-    .sort({ name: 1 })
-    .lean();
-  res.json(parts);
+  const linked = (req.query.linked ?? 'true') === 'true';
+
+  if (linked) {
+    const parts = await Part.find({ 'supplierOptions.supplier': supplierId })
+      .select('internalSku name category unit supplierOptions')
+      .sort({ name: 1 })
+      .lean();
+    return res.json(parts);
+  } else {
+    const parts = await Part.find({
+      $or: [
+        { supplierOptions: { $exists: false } },
+        { supplierOptions: { $size: 0 } },
+        { supplierOptions: { $not: { $elemMatch: { supplier: supplierId } } } }
+      ]
+    })
+      .select('internalSku name category unit supplierOptions')
+      .sort({ name: 1 })
+      .lean();
+    return res.json(parts);
+  }
+});
+
+/** Link this supplier to a part (adds/updates supplierOptions element) */
+router.post('/:id/link-part', requireAuth, requireRole('admin'), async (req, res) => {
+  const supplierId = req.params.id;
+  const body = z.object({
+    partId: z.string().min(1),
+    supplierSku: z.string().optional().default(''),
+    price: z.coerce.number().optional().default(0),
+    currency: z.string().optional().default('USD'),
+    leadTimeDays: z.coerce.number().optional().default(0),
+    moq: z.coerce.number().optional().default(1),
+    preferred: z.boolean().optional().default(false)
+  }).parse(req.body);
+
+  const part = await Part.findById(body.partId);
+  if (!part) return res.status(404).json({ error: 'Part not found' });
+
+  const idx = (part.supplierOptions || []).findIndex(o => String(o.supplier) === String(supplierId));
+  const payload = {
+    supplier: supplierId,
+    supplierSku: body.supplierSku,
+    price: body.price,
+    currency: body.currency,
+    leadTimeDays: body.leadTimeDays,
+    moq: body.moq,
+    preferred: body.preferred
+  };
+  if (idx >= 0) part.supplierOptions[idx] = payload;
+  else part.supplierOptions.push(payload);
+
+  await part.save();
+  res.json(part);
+});
+
+/** Unlink this supplier from a part (removes supplierOptions element) */
+router.delete('/:id/link-part/:partId', requireAuth, requireRole('admin'), async (req, res) => {
+  const supplierId = req.params.id;
+  const partId = req.params.partId;
+  const out = await Part.findByIdAndUpdate(
+    partId,
+    { $pull: { supplierOptions: { supplier: supplierId } } },
+    { new: true }
+  );
+  if (!out) return res.status(404).json({ error: 'Part not found' });
+  res.json(out);
 });
 
 export default router;

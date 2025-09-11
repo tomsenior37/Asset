@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import {
   getAsset, updateAsset, listParts,
   listAssetAttachments, uploadAssetAttachment,
-  deleteAssetAttachment, setMainPhoto
+  deleteAssetAttachment, setMainPhoto,
+  listJobs, createJob, updateJob, deleteJob
 } from '../services/api';
 import {
   Table, TableBody, TableCell, TableHead, TableRow,
@@ -14,57 +15,19 @@ function BomRow({ row, index, parts, onChange, onRemove }) {
   return (
     <TableRow>
       <TableCell style={{minWidth: 240}}>
-        <Select
-          displayEmpty
-          value={row.part || ''}
-          onChange={e => onChange(index, { ...row, part: e.target.value || '' })}
-          style={{minWidth: 220}}
-        >
+        <Select displayEmpty value={row.part || ''} onChange={e => onChange(index, { ...row, part: e.target.value || '' })} style={{minWidth: 220}}>
           <MenuItem value="">(free text)</MenuItem>
           {parts.map(p => (
             <MenuItem key={p._id} value={p._id}>{p.internalSku} — {p.name}</MenuItem>
           ))}
         </Select>
       </TableCell>
-      <TableCell>
-        <TextField
-          label="Part Name"
-          value={row.partName || ''}
-          onChange={e=>onChange(index, { ...row, partName: e.target.value })}
-        />
-      </TableCell>
-      <TableCell>
-        <TextField
-          label="Part No."
-          value={row.partNo || ''}
-          onChange={e=>onChange(index, { ...row, partNo: e.target.value })}
-        />
-      </TableCell>
-      <TableCell style={{width:110}}>
-        <TextField
-          type="number"
-          label="Qty"
-          value={row.qty ?? 1}
-          onChange={e=>onChange(index, { ...row, qty: Number(e.target.value) })}
-        />
-      </TableCell>
-      <TableCell style={{width:120}}>
-        <TextField
-          label="Unit"
-          value={row.unit || 'ea'}
-          onChange={e=>onChange(index, { ...row, unit: e.target.value })}
-        />
-      </TableCell>
-      <TableCell>
-        <TextField
-          label="Notes"
-          value={row.notes || ''}
-          onChange={e=>onChange(index, { ...row, notes: e.target.value })}
-        />
-      </TableCell>
-      <TableCell style={{width:90}}>
-        <Button color="error" variant="outlined" onClick={()=>onRemove(index)}>Delete</Button>
-      </TableCell>
+      <TableCell><TextField label="Part Name" value={row.partName || ''} onChange={e=>onChange(index, { ...row, partName: e.target.value })} /></TableCell>
+      <TableCell><TextField label="Part No." value={row.partNo || ''} onChange={e=>onChange(index, { ...row, partNo: e.target.value })} /></TableCell>
+      <TableCell style={{width:110}}><TextField type="number" label="Qty" value={row.qty ?? 1} onChange={e=>onChange(index, { ...row, qty: Number(e.target.value) })} /></TableCell>
+      <TableCell style={{width:120}}><TextField label="Unit" value={row.unit || 'ea'} onChange={e=>onChange(index, { ...row, unit: e.target.value })} /></TableCell>
+      <TableCell><TextField label="Notes" value={row.notes || ''} onChange={e=>onChange(index, { ...row, notes: e.target.value })} /></TableCell>
+      <TableCell style={{width:90}}><Button color="error" variant="outlined" onClick={()=>onRemove(index)}>Delete</Button></TableCell>
     </TableRow>
   );
 }
@@ -75,11 +38,23 @@ export default function AssetDetailPage(){
   const [parts, setParts] = useState([]);
   const [bom, setBom] = useState([]);
   const [attachments, setAttachments] = useState([]);
+  const [jobs, setJobs] = useState([]);
+
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [tab, setTab] = useState(0);
 
+  const [jobForm, setJobForm] = useState({
+    title: '', description: '',
+    priority: 'normal', status: 'open', dueDate: ''
+  });
+
   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+
+  async function refreshJobs(){
+    const j = await listJobs(id);
+    setJobs(j || []);
+  }
 
   useEffect(() => {
     (async () => {
@@ -90,18 +65,14 @@ export default function AssetDetailPage(){
       setParts(lp.items || []);
       const att = await listAssetAttachments(id);
       setAttachments(att || []);
+      await refreshJobs();
     })();
   }, [id]);
 
-  function addLine(){
-    setBom([...(bom || []), { part: '', partName: '', partNo: '', qty: 1, unit: 'ea', notes: '' }]);
-  }
-  function updateLine(idx, row){
-    const next = [...bom]; next[idx] = row; setBom(next);
-  }
-  function removeLine(idx){
-    const next = [...bom]; next.splice(idx, 1); setBom(next);
-  }
+  function addLine(){ setBom([...(bom || []), { part: '', partName: '', partNo: '', qty: 1, unit: 'ea', notes: '' }]); }
+  function updateLine(idx, row){ const next = [...bom]; next[idx] = row; setBom(next); }
+  function removeLine(idx){ const next = [...bom]; next.splice(idx, 1); setBom(next); }
+
   async function saveBom(){
     setSaving(true); setMsg('');
     try{
@@ -114,14 +85,10 @@ export default function AssetDetailPage(){
         notes: b.notes || ''
       }));
       const updated = await updateAsset(id, { bom: clean });
-      setAsset(updated);
-      setBom(updated.bom || []);
+      setAsset(updated); setBom(updated.bom || []);
       setMsg('BOM saved ✓');
-    }catch(e){
-      setMsg(e.response?.data?.error || e.message);
-    }finally{
-      setSaving(false);
-    }
+    }catch(e){ setMsg(e.response?.data?.error || e.message); }
+    finally{ setSaving(false); }
   }
 
   async function onUploadFile(file){
@@ -129,9 +96,7 @@ export default function AssetDetailPage(){
     await uploadAssetAttachment(id, file);
     const att = await listAssetAttachments(id);
     setAttachments(att || []);
-    // if it's the first photo and none set, offer to set main
   }
-
   async function onDeleteFile(filename){
     await deleteAssetAttachment(id, filename);
     const att = await listAssetAttachments(id);
@@ -139,18 +104,37 @@ export default function AssetDetailPage(){
     const fresh = await getAsset(id);
     setAsset(fresh);
   }
-
   async function onSetMain(filename){
     await setMainPhoto(id, filename);
     const fresh = await getAsset(id);
     setAsset(fresh);
   }
 
-  if(!asset) return <div className="card"><p>Loading…</p></div>;
+  // Jobs
+  async function createJobSubmit(e){
+    e?.preventDefault?.();
+    const payload = {
+      title: jobForm.title,
+      description: jobForm.description || '',
+      priority: jobForm.priority || 'normal',
+      status: jobForm.status || 'open',
+      dueDate: jobForm.dueDate ? new Date(jobForm.dueDate) : null
+    };
+    await createJob(id, payload);
+    setJobForm({ title: '', description: '', priority: 'normal', status: 'open', dueDate: '' });
+    await refreshJobs();
+  }
+  async function markJob(jobId, status){
+    await updateJob(jobId, { status });
+    await refreshJobs();
+  }
+  async function deleteJobRow(jobId){
+    await deleteJob(jobId);
+    await refreshJobs();
+  }
 
-  const mainUrl = asset.mainPhoto
-    ? `${apiBase}/uploads/assets/${id}/${asset.mainPhoto}`
-    : '';
+  if(!asset) return <div className="card"><p>Loading…</p></div>;
+  const mainUrl = asset.mainPhoto ? `${apiBase}/uploads/assets/${id}/${asset.mainPhoto}` : '';
 
   return (
     <div>
@@ -164,20 +148,17 @@ export default function AssetDetailPage(){
               <small>Serial:</small> <strong>{asset.serial||'—'}</strong>
             </div>
           </div>
-          <div>
-            <Link to="/assets"><Button variant="outlined">← Back to Assets</Button></Link>
-          </div>
+          <div><Link to="/assets"><Button variant="outlined">← Back to Assets</Button></Link></div>
         </div>
         <div style={{marginTop:10}}>
-          {mainUrl
-            ? <img src={mainUrl} alt="main" style={{maxHeight:180, border:'1px solid #ddd', borderRadius:8}}/>
-            : <em>No main photo</em>}
+          {mainUrl ? <img src={mainUrl} alt="main" style={{maxHeight:180, border:'1px solid #ddd', borderRadius:8}}/> : <em>No main photo</em>}
         </div>
       </div>
 
       <Tabs value={tab} onChange={(_,v)=>setTab(v)} sx={{mb:1}}>
         <Tab label="BOM" />
         <Tab label="Documents" />
+        <Tab label="Jobs" />
       </Tabs>
 
       {/* BOM TAB */}
@@ -220,9 +201,7 @@ export default function AssetDetailPage(){
         <div className="card">
           <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
             <h3 style={{margin:0}}>Documents</h3>
-            <div className="row">
-              <input type="file" onChange={e=>onUploadFile(e.target.files?.[0])} />
-            </div>
+            <div className="row"><input type="file" onChange={e=>onUploadFile(e.target.files?.[0])} /></div>
           </div>
 
           {!attachments.length && <p><em>No files uploaded.</em></p>}
@@ -245,10 +224,7 @@ export default function AssetDetailPage(){
                     <TableRow key={att.filename}>
                       <TableCell>
                         <div className="row" style={{alignItems:'center', gap:12}}>
-                          {isImage
-                            ? <img src={url} alt={att.originalname} style={{height:48, border:'1px solid #ddd', borderRadius:6}}/>
-                            : <span style={{fontSize:12, padding:'4px 6px', border:'1px solid #ddd', borderRadius:6}}>FILE</span>
-                          }
+                          {isImage ? <img src={url} alt={att.originalname} style={{height:48, border:'1px solid #ddd', borderRadius:6}}/> : <span style={{fontSize:12, padding:'4px 6px', border:'1px solid #ddd', borderRadius:6}}>FILE</span>}
                           <a href={url} target="_blank" rel="noreferrer">{att.originalname || att.filename}</a>
                           {isMain && <span style={{fontSize:12, color:'#0a0', marginLeft:6}}>(main)</span>}
                         </div>
@@ -265,6 +241,68 @@ export default function AssetDetailPage(){
                     </TableRow>
                   );
                 })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      )}
+
+      {/* JOBS TAB */}
+      {tab === 2 && (
+        <div className="card">
+          <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
+            <h3 style={{margin:0}}>Jobs</h3>
+          </div>
+
+          <form onSubmit={createJobSubmit} className="row" style={{marginBottom:12}}>
+            <TextField label="Title" value={jobForm.title} onChange={e=>setJobForm({...jobForm, title:e.target.value})}/>
+            <Select value={jobForm.priority} onChange={e=>setJobForm({...jobForm, priority:e.target.value})}>
+              <MenuItem value="low">low</MenuItem>
+              <MenuItem value="normal">normal</MenuItem>
+              <MenuItem value="high">high</MenuItem>
+              <MenuItem value="urgent">urgent</MenuItem>
+            </Select>
+            <Select value={jobForm.status} onChange={e=>setJobForm({...jobForm, status:e.target.value})}>
+              <MenuItem value="open">open</MenuItem>
+              <MenuItem value="in_progress">in progress</MenuItem>
+              <MenuItem value="done">done</MenuItem>
+              <MenuItem value="cancelled">cancelled</MenuItem>
+            </Select>
+            <TextField label="Due date" type="date" InputLabelProps={{shrink:true}} value={jobForm.dueDate} onChange={e=>setJobForm({...jobForm, dueDate:e.target.value})}/>
+            <TextField label="Description" value={jobForm.description} onChange={e=>setJobForm({...jobForm, description:e.target.value})} />
+            <Button variant="contained" type="submit">Add</Button>
+          </form>
+
+          {!jobs.length && <p><em>No jobs yet.</em></p>}
+          {!!jobs.length && (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Priority</TableCell>
+                  <TableCell>Due</TableCell>
+                  <TableCell>Updated</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {jobs.map(j => (
+                  <TableRow key={j._id}>
+                    <TableCell>{j.title}</TableCell>
+                    <TableCell>{j.status}</TableCell>
+                    <TableCell>{j.priority}</TableCell>
+                    <TableCell>{j.dueDate ? new Date(j.dueDate).toLocaleDateString() : '—'}</TableCell>
+                    <TableCell>{new Date(j.updatedAt).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <div className="row">
+                        {j.status !== 'done' && <Button size="small" variant="outlined" onClick={()=>markJob(j._id,'done')}>Mark done</Button>}
+                        {j.status !== 'in_progress' && <Button size="small" variant="outlined" onClick={()=>markJob(j._id,'in_progress')}>In progress</Button>}
+                        <Button size="small" color="error" variant="outlined" onClick={()=>deleteJobRow(j._id)}>Delete</Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}

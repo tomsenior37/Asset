@@ -38,16 +38,13 @@ const TEMPLATES = {
   ]
 };
 
-/* PUBLIC: allow direct browser download without auth */
-router.get('/imports/template/:type', (req, res) => {
-  const type = String(req.params.type || '').toLowerCase();
-  if (!TEMPLATES[type]) return res.status(400).json({ error: 'Unknown template type' });
+/* ------------------------------ UTILITIES --------------------------------- */
+function sendCSV(res, filename, rows, header = true) {
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="${type}_template.csv"`);
-  csvStringify([TEMPLATES[type]], { header: false }).pipe(res);
-});
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  csvStringify(rows, { header }).pipe(res);
+}
 
-/* ----------------------------- CSV PARSER --------------------------------- */
 function readCSV(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -64,11 +61,130 @@ function readCSV(req) {
   });
 }
 
-/* ------------------------------ HELPERS ----------------------------------- */
 async function clientByCode(code){ return code ? Client.findOne({ code: String(code).toUpperCase() }).lean() : null; }
 async function locByCode(clientId, code){ return (clientId && code) ? Location.findOne({ client: clientId, code }).lean() : null; }
 
-/* ------------------------- IMPORT/VALIDATE HANDLERS ------------------------ */
+/* ------------------------------- TEMPLATES -------------------------------- */
+/** PUBLIC template download (no auth so browsers can click) */
+router.get('/imports/template/:type', (req, res) => {
+  const type = String(req.params.type || '').toLowerCase();
+  if (!TEMPLATES[type]) return res.status(400).json({ error: 'Unknown template type' });
+  return sendCSV(res, `${type}_template.csv`, [TEMPLATES[type]], false);
+});
+
+/* ------------------------------- EXPORTS ---------------------------------- */
+/** CSV Exports for each type */
+router.get('/exports/:type', requireAuth, async (req, res) => {
+  const type = String(req.params.type || '').toLowerCase();
+
+  try {
+    if (type === 'clients') {
+      const items = await Client.find().lean();
+      const rows = [TEMPLATES.clients, ...items.map(c => [
+        c.code, c.name, c.notes || '', c.addressLine1 || '', c.addressLine2 || '',
+        c.city || '', c.state || '', c.postcode || '', c.country || '',
+        c.contactName || '', c.phone || '', c.email || '', c.website || ''
+      ])];
+      return sendCSV(res, 'clients.csv', rows, false);
+    }
+
+    if (type === 'locations') {
+      const items = await Location.find().lean();
+      const clients = await Client.find().lean();
+      const codeByClient = Object.fromEntries(clients.map(c => [String(c._id), c.code]));
+      const parentById = Object.fromEntries(items.map(l => [String(l._id), l]));
+      const rows = [TEMPLATES.locations, ...items.map(l => [
+        codeByClient[String(l.client)] || '',
+        l.kind,
+        l.code,
+        l.name,
+        l.parent ? (parentById[String(l.parent)]?.code || '') : ''
+      ])];
+      return sendCSV(res, 'locations.csv', rows, false);
+    }
+
+    if (type === 'assets') {
+      const items = await Asset.find().lean();
+      const locs = await Location.find().lean();
+      const clients = await Client.find().lean();
+      const locCodeById = Object.fromEntries(locs.map(l => [String(l._id), l.code]));
+      const clientCodeById = Object.fromEntries(clients.map(c => [String(c._id), c.code]));
+      const rows = [TEMPLATES.assets, ...items.map(a => [
+        clientCodeById[String(a.client)] || '',
+        locCodeById[String(a.location)] || '',
+        a.name, a.tag || '', a.category || '', a.model || '', a.serial || '',
+        a.status || 'active', a.notes || ''
+      ])];
+      return sendCSV(res, 'assets.csv', rows, false);
+    }
+
+    if (type === 'parts') {
+      const items = await Part.find().lean();
+      const rows = [TEMPLATES.parts, ...items.map(p => [
+        p.internalSku, p.name, p.category || '', p.unit || '', p.notes || '',
+        (p.internal?.onHand ?? 0), (p.internal?.standardCost ?? 0),
+        (p.internal?.reorderPoint ?? 0), (p.internal?.reorderQty ?? 0)
+      ])];
+      return sendCSV(res, 'parts.csv', rows, false);
+    }
+
+    if (type === 'suppliers') {
+      const items = await Supplier.find().lean();
+      const rows = [TEMPLATES.suppliers, ...items.map(s => [
+        s.code, s.name, s.email || '', s.phone || '', s.website || '', s.address || '', s.notes || ''
+      ])];
+      return sendCSV(res, 'suppliers.csv', rows, false);
+    }
+
+    if (type === 'supplier_parts') {
+      const items = await Part.find().lean();
+      const suppliers = await Supplier.find().lean();
+      const supCodeById = Object.fromEntries(suppliers.map(s => [String(s._id), s.code]));
+      const header = TEMPLATES.supplier_parts;
+      const rows = [header];
+      for (const p of items) {
+        for (const opt of (p.supplierOptions || [])) {
+          rows.push([
+            supCodeById[String(opt.supplier)] || '',
+            p.internalSku,
+            opt.supplierSku || '',
+            opt.price ?? 0,
+            opt.currency || 'USD',
+            opt.leadTimeDays ?? 0,
+            opt.moq ?? 1,
+            opt.preferred ? 'true' : 'false'
+          ]);
+        }
+      }
+      return sendCSV(res, 'supplier_parts.csv', rows, false);
+    }
+
+    if (type === 'jobs') {
+      const items = await Job.find().lean();
+      const clients = await Client.find().lean();
+      const locs = await Location.find().lean();
+      const clientCodeById = Object.fromEntries(clients.map(c => [String(c._id), c.code]));
+      const locCodeById = Object.fromEntries(locs.map(l => [String(l._id), l.code]));
+      const rows = [TEMPLATES.jobs, ...items.map(j => [
+        j.jobNumber, j.poNumber || '', clientCodeById[String(j.client)] || '',
+        j.location ? (locCodeById[String(j.location)] || '') : '',
+        '', // asset_tag not tracked as key (optional)
+        j.title, j.description || '',
+        j.startDate ? new Date(j.startDate).toISOString().slice(0,10) : '',
+        j.quoteDueDate ? new Date(j.quoteDueDate).toISOString().slice(0,10) : '',
+        j.status || 'investigate_quote'
+      ])];
+      return sendCSV(res, 'jobs.csv', rows, false);
+    }
+
+    return res.status(400).json({ error: 'Unknown export type' });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+/* ------------------------------ IMPORT CORE ------------------------------- */
+/** Core import/validate handlers (same logic as before, trimmed for brevity) */
 async function importClients(rows, dryRun){
   const details=[]; let inserted=0, updated=0, errors=0;
   for (let i=0;i<rows.length;i++){
@@ -94,7 +210,6 @@ async function importClients(rows, dryRun){
   }
   return { rows:details, summary:{ inserted, updated, errors, total:rows.length } };
 }
-
 async function importLocations(rows, dryRun){
   const details=[]; let inserted=0, updated=0, errors=0;
   for(let i=0;i<rows.length;i++){
@@ -125,15 +240,13 @@ async function importLocations(rows, dryRun){
   }
   return { rows:details, summary:{ inserted, updated, errors, total:rows.length } };
 }
-
 async function importAssets(rows, dryRun){
   const details=[]; let inserted=0, updated=0, errors=0;
   for(let i=0;i<rows.length;i++){
     try{
-      const r=rows[i]; const c=await clientByCode(r.client_code);
-      if(!c) throw new Error('client_code not found');
-      const loc=await locByCode(c._id, r.location_code);
-      if(!loc) throw new Error('location_code not found for client');
+      const r=rows[i];
+      const c=await clientByCode(r.client_code); if(!c) throw new Error('client_code not found');
+      const loc=await locByCode(c._id, r.location_code); if(!loc) throw new Error('location_code not found for client');
       const payload={
         client:c._id, location:loc._id,
         name:r.name, tag:r.tag||'', category:r.category||'',
@@ -157,7 +270,6 @@ async function importAssets(rows, dryRun){
   }
   return { rows:details, summary:{ inserted, updated, errors, total:rows.length } };
 }
-
 async function importParts(rows, dryRun){
   const details=[]; let inserted=0, updated=0, errors=0;
   for(let i=0;i<rows.length;i++){
@@ -166,14 +278,8 @@ async function importParts(rows, dryRun){
       if(!internalSku||!name) throw new Error('internalSku and name required');
       const payload={
         internalSku, name, category:r.category||'', unit:r.unit||'', notes:r.notes||'',
-        specs:{},
-        supplierOptions:[],
-        internal:{
-          onHand:Number(r.onHand||0),
-          standardCost:Number(r.standardCost||0),
-          reorderPoint:Number(r.reorderPoint||0),
-          reorderQty:Number(r.reorderQty||0)
-        }
+        specs:{}, supplierOptions:[],
+        internal:{ onHand:Number(r.onHand||0), standardCost:Number(r.standardCost||0), reorderPoint:Number(r.reorderPoint||0), reorderQty:Number(r.reorderQty||0) }
       };
       if(!dryRun){
         const doc=await Part.findOneAndUpdate({ internalSku }, { $set:payload }, { new:true, upsert:true, setDefaultsOnInsert:true });
@@ -187,7 +293,6 @@ async function importParts(rows, dryRun){
   }
   return { rows:details, summary:{ inserted, updated, errors, total:rows.length } };
 }
-
 async function importSuppliers(rows, dryRun){
   const details=[]; let inserted=0, updated=0, errors=0;
   for(let i=0;i<rows.length;i++){
@@ -207,7 +312,6 @@ async function importSuppliers(rows, dryRun){
   }
   return { rows:details, summary:{ inserted, updated, errors, total:rows.length } };
 }
-
 async function importSupplierParts(rows, dryRun){
   const details=[]; let linked=0, updated=0, errors=0;
   for(let i=0;i<rows.length;i++){
@@ -217,15 +321,7 @@ async function importSupplierParts(rows, dryRun){
       const part=await Part.findOne({ internalSku:r.part_internalSku });
       if(!sup) throw new Error('supplier_code not found');
       if(!part) throw new Error('part_internalSku not found');
-      const payload={
-        supplier:sup._id,
-        supplierSku:r.supplierSku||'',
-        price:Number(r.price||0),
-        currency:r.currency||'USD',
-        leadTimeDays:Number(r.leadTimeDays||0),
-        moq:Number(r.moq||1),
-        preferred:String(r.preferred||'').toLowerCase()==='true'
-      };
+      const payload={ supplier:sup._id, supplierSku:r.supplierSku||'', price:Number(r.price||0), currency:r.currency||'USD', leadTimeDays:Number(r.leadTimeDays||0), moq:Number(r.moq||1), preferred:String(r.preferred||'').toLowerCase()==='true' };
       if(!dryRun){
         const idx=(part.supplierOptions||[]).findIndex(o=>String(o.supplier)===String(sup._id));
         if(idx>=0){ part.supplierOptions[idx]=payload; updated++; }
@@ -239,7 +335,6 @@ async function importSupplierParts(rows, dryRun){
   }
   return { rows:details, summary:{ linked, updated, errors, total:rows.length } };
 }
-
 async function importJobs(rows, dryRun){
   const details=[]; let inserted=0, updated=0, errors=0;
   for(let i=0;i<rows.length;i++){
@@ -303,6 +398,140 @@ router.post('/imports/:type', requireAuth, requireRole('admin'), async (req, res
   }catch(e){
     res.status(400).json({ error:e.message });
   }
+});
+
+/* ------------------------ WIZARD: TRANSFORMERS ---------------------------- */
+/** 
+ * POST /imports/wizard/locations?client_code=ALCOA&preview=1
+ * Accepts a source CSV and outputs our locations template columns.
+ * If preview=1 → JSON preview; otherwise → downloads CSV.
+ * It tries to auto-detect typical Snipe-IT style columns:
+ *   Company/Client, Location/Name, Code/ID, Parent/Parent Location, Type(kind)
+ */
+router.post('/imports/wizard/locations', requireAuth, requireRole('admin'), async (req, res) => {
+  try{
+    const rows = await readCSV(req);
+    const defaultClient = String(req.query.client_code || '').toUpperCase() || null;
+    const preview = String(req.query.preview || '0') === '1';
+
+    const out = [TEMPLATES.locations];
+    const details = [];
+    let ok=0, bad=0;
+
+    for (let i=0;i<rows.length;i++){
+      const r = rows[i];
+      const client_code = (String(
+        r.client_code || r.Client || r.Company || defaultClient || ''
+      )).toUpperCase();
+
+      const name = r.name || r.Location || r['Location Name'] || r['Site Name'] || '';
+      const code = r.code || r['Location ID'] || r['Code'] || r['Site Code'] || r['Location'] || '';
+      const parent_code = r['parent_code(optional)'] || r['Parent'] || r['Parent Location'] || r['Site'] || '';
+      const kindSource = (r.kind || r.Type || r['Location Type'] || '').toLowerCase();
+
+      const kind = (kindSource==='area' || kindSource==='site') 
+        ? kindSource 
+        : (parent_code ? 'area' : 'site');
+
+      if (!client_code || !name || !code){
+        bad++; details.push({ rowIndex:i+1, ok:false, message:'Missing client_code or name or code' });
+        continue;
+      }
+
+      out.push([client_code, kind, String(code).trim(), String(name).trim(), String(parent_code||'').trim()]);
+      ok++; details.push({ rowIndex:i+1, ok:true, message:'ok' });
+    }
+
+    if (preview) {
+      return res.json({ ok:true, type:'wizard_locations', template:TEMPLATES.locations, summary:{ok,bad,total:rows.length}, rows:details });
+    }
+    return sendCSV(res, 'locations.csv', out, false);
+  }catch(e){ return res.status(400).json({ error:e.message }); }
+});
+
+/**
+ * POST /imports/wizard/assets?preview=1&client_code=ALCOA&use_db_locations=1
+ * Transforms a source CSV into our assets template.
+ * RULES:
+ *  - Ignore any company/client field in the source; assets map **only by location** name/code.
+ *  - Only include assets whose location is already known (either in DB).
+ *  - If client_code is provided, it is used for output client_code column.
+ * Auto-detect columns: Location / Location Name / Area / Site / Code; Name, Tag, Model, Serial, Category, Status, Notes.
+ */
+router.post('/imports/wizard/assets', requireAuth, requireRole('admin'), async (req, res) => {
+  try{
+    const rows = await readCSV(req);
+    const preview = String(req.query.preview || '0') === '1';
+    const outputClientCode = String(req.query.client_code || '').toUpperCase() || null;
+    const useDb = String(req.query.use_db_locations || '1') === '1';
+
+    // Build a set of known location codes from DB (for any client), if requested
+    const knownLocs = new Set();
+    if (useDb) {
+      const all = await Location.find().select('code').lean();
+      for (const l of all) knownLocs.add(String(l.code).trim());
+    }
+
+    const out = [TEMPLATES.assets];
+    const details = [];
+    let ok=0, skipped=0, bad=0;
+
+    for (let i=0;i<rows.length;i++){
+      const r = rows[i];
+
+      // derive a location_code from likely columns (ignore company/client completely)
+      const locCode =
+        r.location_code || r['Location Code'] || r['Location'] || r['Location Name'] ||
+        r['Area'] || r['Site'] || r['Site Code'] || r['Area Code'] || '';
+
+      const name = r.name || r['Asset Name'] || r['Name'] || '';
+      const tag = r.tag || r['Asset Tag'] || r['Tag'] || '';
+      const category = r.category || r['Category'] || '';
+      const model = r.model || r['Model'] || '';
+      const serial = r.serial || r['Serial'] || '';
+      const statusRaw = (r.status || r['Status'] || '').toLowerCase();
+      const notes = r.notes || r['Notes'] || '';
+
+      // map status to allowed set
+      const allowedStatus = ['active','spare','retired','missing'];
+      const status = allowedStatus.includes(statusRaw) ? statusRaw : 'active';
+
+      if (!locCode || !name){
+        bad++; details.push({ rowIndex:i+1, ok:false, message:'Missing location or name' });
+        continue;
+      }
+
+      // Require location to already be mapped/known
+      if (useDb && !knownLocs.has(String(locCode).trim())){
+        skipped++; details.push({ rowIndex:i+1, ok:false, message:`Location not found: ${locCode} (skipped)` });
+        continue;
+      }
+
+      const client_code = outputClientCode || ''; // if you want a fixed client code in output
+      out.push([
+        client_code,                  // client_code (can be blank if you will add later)
+        String(locCode).trim(),       // location_code
+        String(name).trim(),          // name
+        String(tag||'').trim(),
+        String(category||'').trim(),
+        String(model||'').trim(),
+        String(serial||'').trim(),
+        status,
+        String(notes||'').trim()
+      ]);
+      ok++; details.push({ rowIndex:i+1, ok:true, message:'ok' });
+    }
+
+    if (preview) {
+      return res.json({
+        ok:true, type:'wizard_assets',
+        template:TEMPLATES.assets,
+        summary:{ ok, skipped, bad, total:rows.length },
+        rows:details
+      });
+    }
+    return sendCSV(res, 'assets.csv', out, false);
+  }catch(e){ return res.status(400).json({ error:e.message }); }
 });
 
 export default router;

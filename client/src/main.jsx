@@ -5,7 +5,9 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import ClientsPage from './pages/ClientsPage.jsx'
 import ClientDetailPage from './pages/ClientDetailPage.jsx'
 import LocationsPage from './pages/LocationsPage.jsx'
-import LocationDetailPage from './pages/LocationDetailPage.jsx'
+import ClientLocationsPage from './pages/ClientLocationsPage.jsx'
+import SiteDetailPage from './pages/SiteDetailPage.jsx'
+import AreaDetailPage from './pages/AreaDetailPage.jsx'
 
 import AssetsPage from './pages/AssetsPage.jsx'
 import AssetDetailPage from './pages/AssetDetailPage.jsx'
@@ -56,7 +58,9 @@ function Layout() {
           <Route path="/clients/:id" element={<ClientDetailPage />} />
 
           <Route path="/locations" element={<LocationsPage />} />
-          <Route path="/locations/:id" element={<LocationDetailPage />} />
+          <Route path="/clients/:id/locations" element={<ClientLocationsPage />} />
+          <Route path="/sites/:id" element={<SiteDetailPage />} />
+          <Route path="/areas/:id" element={<AreaDetailPage />} />
 
           <Route path="/assets" element={<AssetsPage />} />
           <Route path="/assets/:id" element={<AssetDetailPage />} />

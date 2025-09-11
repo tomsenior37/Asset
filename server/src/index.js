@@ -13,7 +13,7 @@ import assetsRouter from './routes/assets.js';
 import partsRouter from './routes/parts.js';
 import suppliersRouter from './routes/suppliers.js';
 import authRouter from './routes/auth.js';
-import jobsRouter from './routes/jobs.js'; // <-- NEW
+import jobsRouter from './routes/jobs.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -33,21 +33,15 @@ app.use('/api', locationsRouter);
 app.use('/api/assets', assetsRouter);
 app.use('/api/parts', partsRouter);
 app.use('/api/suppliers', suppliersRouter);
-app.use('/api', jobsRouter); // <-- NEW
+app.use('/api', jobsRouter);
 
-// uploads
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
-
-// 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
-mongoose
-  .connect(MONGO_URI, { autoIndex: true })
-  .then(() => {
-    console.log('Mongo connected');
-    app.listen(PORT, () => console.log(`Server on :${PORT}`));
-  })
-  .catch((e) => {
-    console.error('Mongo connection error:', e.message);
-    process.exit(1);
-  });
+mongoose.connect(MONGO_URI, { autoIndex: true }).then(() => {
+  console.log('Mongo connected');
+  app.listen(PORT, () => console.log(`Server on :${PORT}`));
+}).catch((e) => {
+  console.error('Mongo connection error:', e.message);
+  process.exit(1);
+});

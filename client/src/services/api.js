@@ -10,6 +10,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ... keep existing imports and interceptor ...
+/* Jobs (global) */
+export async function listJobsGlobal(params){ const { data } = await api.get('/jobs', { params }); return data; }
+export async function createJobGlobal(payload){ const { data } = await api.post('/jobs', payload); return data; }
+export async function getJob(id){ const { data } = await api.get('/jobs/' + id); return data; }
+export async function updateJobGlobal(id, payload){ const { data } = await api.patch('/jobs/' + id, payload); return data; }
+export async function deleteJobGlobal(id){ const { data } = await api.delete('/jobs/' + id); return data; }
+export async function addJobResource(id, payload){ const { data } = await api.post(`/jobs/${id}/resources`, payload); return data; }
+export async function updateJobResource(id, rid, payload){ const { data } = await api.patch(`/jobs/${id}/resources/${rid}`, payload); return data; }
+export async function deleteJobResource(id, rid){ const { data } = await api.delete(`/jobs/${id}/resources/${rid}`); return data; }
+
 /* Clients */
 export async function listClients(){ const { data } = await api.get('/clients'); return data; }
 export async function createClient(payload){ const { data } = await api.post('/clients', payload); return data; }

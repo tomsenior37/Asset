@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getPart, updatePart } from '../services/api';
+import { getPart, updatePart, listSuppliers } from '../services/api';
 import { Tabs, Tab, TextField, Button, Table, TableHead, TableBody, TableCell, TableRow, Select, MenuItem } from '@mui/material';
 import { useAuth } from '../AuthContext.jsx';
 
@@ -10,6 +10,7 @@ export default function PartDetailPage(){
   const [tab, setTab] = useState(0);
   const [p, setP] = useState(null);
   const [form, setForm] = useState({});
+  const [suppliers, setSuppliers] = useState([]);
 
   useEffect(() => { (async()=>{
     const part = await getPart(id);
@@ -26,7 +27,12 @@ export default function PartDetailPage(){
         reorderQty: part.internal?.reorderQty || 0
       }
     });
+    setSuppliers(await listSuppliers());
   })(); }, [id]);
+
+  function addSupplierLine(){
+    setForm(f => ({ ...f, supplierOptions: [...(f.supplierOptions||[]), { supplier:'', supplierSku:'', price:0, currency:'USD', leadTimeDays:0, moq:1, preferred:false }] }));
+  }
 
   async function save(){
     const out = await updatePart(id, form);
@@ -80,11 +86,14 @@ export default function PartDetailPage(){
       {/* Suppliers */}
       {tab===1 && (
         <div className="card">
-          <h3>Supplier Options</h3>
+          <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
+            <h3 style={{margin:0}}>Supplier Options</h3>
+            {isAdmin && <Button variant="outlined" onClick={addSupplierLine}>+ Add Supplier</Button>}
+          </div>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Supplier ID</TableCell>
+                <TableCell>Supplier</TableCell>
                 <TableCell>Supplier SKU</TableCell>
                 <TableCell>Price</TableCell>
                 <TableCell>Currency</TableCell>
@@ -97,9 +106,26 @@ export default function PartDetailPage(){
               {(form.supplierOptions||[]).map((opt, i)=>(
                 <TableRow key={i}>
                   <TableCell>
-                    <TextField value={opt.supplier||''} onChange={e=>{
-                      const arr=[...form.supplierOptions]; arr[i]={...arr[i], supplier:e.target.value}; setForm({...form, supplierOptions:arr});
-                    }}/>
+                    <div className="row">
+                      <Select
+                        displayEmpty
+                        value={opt.supplier || ''}
+                        onChange={e=>{
+                          const arr=[...form.supplierOptions]; arr[i]={...arr[i], supplier:e.target.value}; setForm({...form, supplierOptions:arr});
+                        }}
+                        style={{minWidth:220}}
+                      >
+                        <MenuItem value=""><em>Select supplier…</em></MenuItem>
+                        {suppliers.map(s => (
+                          <MenuItem key={s._id} value={s._id}>{s.name} ({s.code})</MenuItem>
+                        ))}
+                      </Select>
+                      {opt.supplier && (
+                        <Link to={`/suppliers/${opt.supplier}`} style={{marginLeft:8}}>
+                          <Button size="small" variant="outlined">View</Button>
+                        </Link>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <TextField value={opt.supplierSku||''} onChange={e=>{

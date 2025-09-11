@@ -1,24 +1,22 @@
-import React, { useEffect, useState } from 'react'
-import { listSuppliers, createSupplier } from '../services/api'
-import { Table, TableBody, TableCell, TableHead, TableRow, TextField, Button } from '@mui/material'
-import { useAuth } from '../AuthContext.jsx'
+import React, { useEffect, useState } from 'react';
+import { listSuppliers, createSupplier } from '../services/api';
+import { Table, TableBody, TableCell, TableHead, TableRow, TextField, Button } from '@mui/material';
+import { useAuth } from '../AuthContext.jsx';
+import { Link } from 'react-router-dom';
 
 export default function SuppliersPage(){
-  const { isAdmin } = useAuth()
-  const [items, setItems] = useState([])
-  const [form, setForm] = useState({ name: '', code: '' })
+  const { isAdmin } = useAuth();
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ name: '', code: '' });
 
-  async function refresh(){
-    const data = await listSuppliers()
-    setItems(data)
-  }
-  useEffect(()=>{ refresh() }, [])
+  async function refresh(){ setItems(await listSuppliers()); }
+  useEffect(()=>{ refresh(); }, []);
 
   async function onCreate(e){
-    e.preventDefault()
-    await createSupplier(form)
-    setForm({ name:'', code:'' })
-    refresh()
+    e.preventDefault();
+    await createSupplier(form);
+    setForm({ name:'', code:'' });
+    refresh();
   }
 
   return (
@@ -40,7 +38,7 @@ export default function SuppliersPage(){
           <TableBody>
             {items.map(s => (
               <TableRow key={s._id}>
-                <TableCell>{s.name}</TableCell>
+                <TableCell><Link to={`/suppliers/${s._id}`}>{s.name}</Link></TableCell>
                 <TableCell>{s.code}</TableCell>
                 <TableCell>{new Date(s.createdAt).toLocaleString()}</TableCell>
               </TableRow>
@@ -49,5 +47,5 @@ export default function SuppliersPage(){
         </Table>
       </div>
     </div>
-  )
+  );
 }

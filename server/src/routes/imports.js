@@ -89,3 +89,4 @@ async function importAssets(rows, dryRun){
 
   return { rows: details, summary: { inserted, updated, errors, total: rows.length } };
 }
+export default router;

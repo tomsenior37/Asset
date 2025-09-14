@@ -1,4 +1,3 @@
-// server/src/db.js
 const { MongoClient } = require('mongodb');
 
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/assetdb';

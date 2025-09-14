@@ -1,0 +1,67 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # -------- Node 20 for everything --------
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # -------- Server (optional) --------
+      - name: Server install
+        if: hashFiles('server/package.json') != ''
+        working-directory: server
+        run: npm ci
+
+      - name: Server lint & test
+        if: hashFiles('server/package.json') != ''
+        working-directory: server
+        run: |
+          npm run lint --if-present
+          npm test --if-present -- --ci
+
+      - name: Server build
+        if: hashFiles('server/package.json') != ''
+        working-directory: server
+        run: npm run build --if-present
+
+      # -------- Client (optional) --------
+      - name: Client install
+        if: hashFiles('client/package.json') != ''
+        working-directory: client
+        run: npm ci
+
+      - name: Client lint & test
+        if: hashFiles('client/package.json') != ''
+        working-directory: client
+        run: |
+          npm run lint --if-present
+          npm test --if-present -- --ci
+
+      - name: Client build
+        if: hashFiles('client/package.json') != ''
+        working-directory: client
+        run: npm run build --if-present
+
+      # -------- Single-repo (no subdirs) fallback --------
+      - name: Root install (fallback)
+        if: hashFiles('server/package.json') == '' && hashFiles('client/package.json') == '' && hashFiles('package.json') != ''
+        run: npm ci
+
+      - name: Root lint/test/build (fallback)
+        if: hashFiles('server/package.json') == '' && hashFiles('client/package.json') == '' && hashFiles('package.json') != ''
+        run: |
+          npm run lint --if-present
+          npm test --if-present -- --ci
+          npm run build --if-present

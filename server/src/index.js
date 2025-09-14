@@ -3,40 +3,29 @@ const express = require('express');
 const cors = require('cors');
 
 const PORT = process.env.PORT || 4000;
-
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-// Mount auth routes first (login/register)
-const authRoutes = require('./authRoutes');
-app.use('/api', authRoutes);
+// Auth routes
+app.use('/api', require('./authRoutes'));
 
-// Mount any existing routes/app if present (best-effort, won’t crash)
+// Best-effort mount of any existing routes/app (won’t crash if absent)
 try {
-  const existingRoutes = require('./routes');
-  if (typeof existingRoutes === 'function') {
-    app.use('/api', existingRoutes());
-    console.log('[index] Mounted ./routes() under /api');
-  } else if (existingRoutes && typeof existingRoutes.use === 'function') {
-    app.use('/api', existingRoutes);
-    console.log('[index] Mounted ./routes under /api');
-  }
-} catch (_) { /* no-op */ }
-
+  const routes = require('./routes');
+  if (typeof routes === 'function') app.use('/api', routes());
+  else if (routes && typeof routes.use === 'function') app.use('/api', routes);
+} catch {}
 try {
   const existingApp = require('./app');
-  if (typeof existingApp === 'function') {
-    app.use(existingApp);
-    console.log('[index] Mounted ./app');
-  }
-} catch (_) { /* no-op */ }
+  if (typeof existingApp === 'function') app.use(existingApp);
+} catch {}
 
-// Health check
+// Health
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => {
-  console.log(`Server on :${PORT}`);
-});
+// Bind to 0.0.0.0 so host publishing works
+app.listen(PORT, '0.0.0.0', () => console.log(`Server on :${PORT}`));
 
 module.exports = app;

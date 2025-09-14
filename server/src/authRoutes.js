@@ -1,8 +1,9 @@
 // server/src/authRoutes.js
-import express from 'express';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import { usersCollection } from './db.js';
+const express = require('express');
+const jwt = require('jsonwebtoken');
+let bcrypt;
+try { bcrypt = require('bcryptjs'); } catch { bcrypt = require('bcrypt'); }
+const { usersCollection } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-prod';
 const ENABLE_REGISTRATION = String(process.env.ENABLE_REGISTRATION || '0') === '1';
@@ -42,7 +43,7 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/register  (guarded: first user OR ENABLE_REGISTRATION=1)
+// POST /api/auth/register (guarded: first user OR ENABLE_REGISTRATION=1)
 router.post('/auth/register', async (req, res) => {
   try {
     const email = norm(req.body?.email);
@@ -81,4 +82,4 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

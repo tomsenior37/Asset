@@ -1,3 +1,4 @@
+// server/src/index.js
 const express = require('express');
 const cors = require('cors');
 let bcrypt;
@@ -5,6 +6,7 @@ try { bcrypt = require('bcryptjs'); } catch { bcrypt = require('bcrypt'); }
 
 const { usersCollection } = require('./db');
 const authRoutes = require('./authRoutes');
+const appRoutes = require('./appRoutes');
 
 const PORT = process.env.PORT || 4000;
 const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
@@ -14,11 +16,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// health early so healthcheck passes post-seed
+// health first
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// mount auth
+// auth endpoints (login)
 app.use('/api', authRoutes);
+
+// application endpoints (auth/me, clients, etc)
+app.use('/api', appRoutes);
 
 // one-time seed on startup if zero users
 (async () => {

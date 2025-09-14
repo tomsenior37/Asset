@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   mongo:
     image: mongo:7
@@ -10,15 +8,15 @@ services:
       - ./data/mongo:/data/db
 
   server:
-    image: assetdb-server
     build:
       context: ./server
       dockerfile: Dockerfile
+    image: assetdb-server
     environment:
       MONGO_URL: "mongodb://mongo:27017/assetdb"
       JWT_SECRET: "change-me-in-prod"
       PORT: "4000"
-      ENABLE_REGISTRATION: "0"
+      ENABLE_REGISTRATION: "0"   # flip to "1" temporarily to self-register
     depends_on:
       - mongo
     ports:
@@ -26,16 +24,16 @@ services:
     restart: unless-stopped
 
   client:
-    image: assetdb-client
     build:
       context: ./client
       dockerfile: Dockerfile
+    image: assetdb-client
     environment:
-      VITE_API_BASE: "/api"   # UI calls /api -> nginx -> server:4000
+      VITE_API_BASE: "/api"
     depends_on:
       - server
     ports:
-      - "80:80"               # serve UI on :80 (no :8080 in URL)
+      - "80:80"
     restart: unless-stopped
 
 networks:

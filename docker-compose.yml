@@ -18,10 +18,8 @@ services:
       MONGO_URL: "mongodb://mongo:27017/assetdb"
       JWT_SECRET: "change-me-in-prod"
       PORT: "4000"
-      # enable ONCE to seed admin, then set back to "0"
-      ENABLE_BOOTSTRAP: "0"
-      BOOTSTRAP_ADMIN_EMAIL: "admin@example.com"
-      BOOTSTRAP_ADMIN_PASSWORD: "TempPass!123"
+      # Registration guarded in code; default is off.
+      ENABLE_REGISTRATION: "0"
     depends_on:
       - mongo
     ports:
@@ -38,7 +36,7 @@ services:
     depends_on:
       - server
     ports:
-      - "8080:80"   # change to "80:80" if you want to serve on port 80
+      - "8080:80"   # use "80:80" if you want no port in URL
     restart: unless-stopped
 
 networks:

@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongo:/data/db
+
+  server:
+    image: assetdb-server
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      # DB & auth
+      MONGO_URL: "mongodb://mongo:27017/assetdb"
+      JWT_SECRET: "change-me-in-prod"
+      PORT: "4000"
+      # set to "1" ONLY to allow the bootstrap route below, then turn off
+      ENABLE_BOOTSTRAP: "0"
+      BOOTSTRAP_ADMIN_EMAIL: "admin@example.com"
+      BOOTSTRAP_ADMIN_PASSWORD: "TempPass!123"
+    depends_on:
+      - mongo
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+  client:
+    image: assetdb-client
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    environment:
+      # client will call the server via Nginx proxy path
+      VITE_API_BASE: "/api"
+    depends_on:
+      - server
+    ports:
+      - "8080:80"   # change to "80:80" if you want root port 80
+    restart: unless-stopped
+
+networks:
+  default:
+    name: assetdb_default

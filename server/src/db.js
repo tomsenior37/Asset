@@ -3,8 +3,7 @@ const { MongoClient } = require('mongodb');
 
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/assetdb';
 
-let _client;
-let _db;
+let _client, _db;
 
 async function connect() {
   if (_db) return _db;
@@ -17,7 +16,6 @@ async function connect() {
 
 async function usersCollection() {
   const db = await connect();
-  // Prefer existing collection names, default to 'users'
   const names = (await db.listCollections().toArray()).map(n => n.name);
   const colName = names.includes('users')
     ? 'users'

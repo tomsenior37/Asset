@@ -1,59 +1,65 @@
 // server/scripts/bootstrap-admin.js
+// CLI one-shot seeding (alternative to the HTTP bootstrap route)
 const { MongoClient } = require('mongodb');
 
-async function main() {
-  const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/assetdb';
-  const email = (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
-  const pass = process.env.BOOTSTRAP_ADMIN_PASSWORD || '';
-  if (!email || !pass) {
-    console.error('Missing BOOTSTRAP_ADMIN_EMAIL or BOOTSTRAP_ADMIN_PASSWORD');
-    process.exit(1);
-  }
-
-  // prefer bcryptjs, fallback to bcrypt
-  let bcrypt;
-  try { bcrypt = require('bcryptjs'); } catch {
-    try { bcrypt = require('bcrypt'); } catch {
-      console.error('Install bcryptjs or bcrypt in server dependencies.');
+(async () => {
+  try {
+    const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/assetdb';
+    const email = (process.argv[2] || '').trim().toLowerCase();
+    const pass = process.argv[3] || '';
+    if (!email || !pass) {
+      console.error('Usage: node scripts/bootstrap-admin.js <email> <password>');
       process.exit(1);
     }
-  }
-  const passwordHash = await bcrypt.hash(pass, 10);
 
-  const client = new MongoClient(MONGO_URL, { ignoreUndefined: true });
-  await client.connect();
+    let bcrypt;
+    try { bcrypt = require('bcryptjs'); } catch { bcrypt = require('bcrypt'); }
+    const passwordHash = await bcrypt.hash(pass, 10);
 
-  const dbName = MONGO_URL.split('/').pop().split('?')[0] || 'assetdb';
-  const db = client.db(dbName);
+    const client = new MongoClient(MONGO_URL);
+    await client.connect();
 
-  // pick collection (default to users)
-  const colNames = await db.listCollections().toArray();
-  const target =
-    (colNames.find(c => c.name === 'users')?.name) ||
-    (colNames.find(c => c.name === 'accounts')?.name) ||
-    'users';
-  const users = db.collection(target);
+    const dbName = MONGO_URL.split('/').pop().split('?')[0] || 'assetdb';
+    const db = client.db(dbName);
+    const names = await db.listCollections().toArray();
 
-  // if ANY user exists, do nothing
-  const existing = await users.findOne({});
-  if (existing) {
-    console.log('Users already exist, skipping bootstrap.');
+    const collectionName =
+      (names.find(n => n.name === 'users')?.name) ||
+      (names.find(n => n.name === 'accounts')?.name) ||
+      'users';
+
+    const col = db.collection(collectionName);
+
+    // if ANY user exists, do nothing
+    const any = await col.findOne({});
+    if (any) {
+      console.log('Users already exist; aborting seed.');
+      await client.close();
+      process.exit(0);
+    }
+
+    const now = new Date();
+    await col.updateOne(
+      { email },
+      {
+        $set: {
+          email,
+          role: 'admin',
+          isActive: true,
+          password: passwordHash,
+          passwordHash,
+          hash: passwordHash,
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+      { upsert: true }
+    );
+    console.log(`Bootstrapped admin: ${email}`);
     await client.close();
-    return;
+    process.exit(0);
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
   }
-
-  const now = new Date();
-  const doc = {
-    email, role: 'admin', isActive: true,
-    // set all common fields so whatever your code expects will match
-    password: passwordHash,
-    passwordHash,
-    hash: passwordHash,
-    createdAt: now, updatedAt: now
-  };
-  await users.updateOne({ email }, { $set: doc }, { upsert: true });
-  console.log(`Bootstrapped admin: ${email}`);
-  await client.close();
-}
-
-main().catch(e => { console.error(e); process.exit(1); });
+})();

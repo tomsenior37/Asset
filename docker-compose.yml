@@ -15,11 +15,10 @@ services:
       context: ./server
       dockerfile: Dockerfile
     environment:
-      # DB & auth
       MONGO_URL: "mongodb://mongo:27017/assetdb"
       JWT_SECRET: "change-me-in-prod"
       PORT: "4000"
-      # set to "1" ONLY to allow the bootstrap route below, then turn off
+      # enable ONCE to seed admin, then set back to "0"
       ENABLE_BOOTSTRAP: "0"
       BOOTSTRAP_ADMIN_EMAIL: "admin@example.com"
       BOOTSTRAP_ADMIN_PASSWORD: "TempPass!123"
@@ -35,12 +34,11 @@ services:
       context: ./client
       dockerfile: Dockerfile
     environment:
-      # client will call the server via Nginx proxy path
       VITE_API_BASE: "/api"
     depends_on:
       - server
     ports:
-      - "8080:80"   # change to "80:80" if you want root port 80
+      - "8080:80"   # change to "80:80" if you want to serve on port 80
     restart: unless-stopped
 
 networks:

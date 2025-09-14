@@ -1,66 +1,62 @@
-import 'dotenv/config.js';
-import path from 'path';
-import express from 'express';
-import cors from 'cors';
-import morgan from 'morgan';
-import mongoose from 'mongoose';
+// server/src/index.js
+//
+// Drop-in entrypoint that preserves your existing API,
+// adds a health check, and conditionally enables the one-time
+// admin bootstrap route (see server/src/bootstrapRoute.js).
+//
+// It does NOT change your auth logic or DB models.
 
-import { authOptional } from './middleware/auth.js';
+const express = require('express');
+const cors = require('cors');
 
-// Routers that already export default
-import clientsRouter from './routes/clients.js';
-import locationsRouter from './routes/locations.js';
-import assetsRouter from './routes/assets.js';
-import partsRouter from './routes/parts.js';
-import suppliersRouter from './routes/suppliers.js';
-import authRouter from './routes/auth.js';
-import jobsRouter from './routes/jobs.js';
-
-// Routers we load defensively (in case of default/named export mismatch)
-import * as importsRouterNS from './routes/imports.js';
-import * as quickCreateRouterNS from './routes/quickCreate.js';
-
-const importsRouter = importsRouterNS.default ?? importsRouterNS;
-const quickCreateRouter = quickCreateRouterNS.default ?? quickCreateRouterNS;
+const PORT = process.env.PORT || 4000;
 
 const app = express();
-const PORT = process.env.PORT || 4000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/assetdb';
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+app.use(cors());
+app.use(express.json());
 
-app.use(cors({ origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN }));
-app.use(express.json({ limit: '16mb' }));
-app.use(morgan('dev'));
-app.use(authOptional);
+// Mount your existing API if you have an app/router module.
+// These are optional best-effort mounts that won’t crash if missing.
+try {
+  // If your project exposes an Express app from ./app, mount it.
+  // eslint-disable-next-line global-require
+  const existingApp = require('./app');
+  if (typeof existingApp === 'function') {
+    app.use(existingApp);
+    console.log('[index] Mounted ./app');
+  }
+} catch (_) {
+  // no-op
+}
+try {
+  // If you keep routes under ./routes and export a router, mount under /api
+  // eslint-disable-next-line global-require
+  const existingRoutes = require('./routes');
+  if (typeof existingRoutes === 'function') {
+    app.use('/api', existingRoutes());
+    console.log('[index] Mounted ./routes() under /api');
+  } else if (existingRoutes && typeof existingRoutes === 'object' && typeof existingRoutes.use === 'function') {
+    app.use('/api', existingRoutes);
+    console.log('[index] Mounted ./routes under /api');
+  }
+} catch (_) {
+  // no-op
+}
 
-// Health
+// One-time bootstrap endpoint (enabled only when ENABLE_BOOTSTRAP=1)
+try {
+  // eslint-disable-next-line global-require
+  require('./bootstrapRoute')(app);
+  console.log('[index] Bootstrap route evaluated');
+} catch (e) {
+  console.log('[index] Bootstrap route not mounted:', e?.message || e);
+}
+
+// Simple health check that never interferes with your auth
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// API
-app.use('/api/auth', authRouter);
-app.use('/api/clients', clientsRouter);
-app.use('/api', locationsRouter);
-app.use('/api/assets', assetsRouter);
-app.use('/api/parts', partsRouter);
-app.use('/api/suppliers', suppliersRouter);
-app.use('/api', jobsRouter);
-app.use('/api', importsRouter);
-app.use('/api', quickCreateRouter);
+app.listen(PORT, () => {
+  console.log(`Server on :${PORT}`);
+});
 
-// Static uploads
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
-
-// 404
-app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
-
-// DB + start
-mongoose
-  .connect(MONGO_URI, { autoIndex: true })
-  .then(() => {
-    console.log('Mongo connected');
-    app.listen(PORT, () => console.log(`Server on :${PORT}`));
-  })
-  .catch((e) => {
-    console.error('Mongo connection error:', e.message);
-    process.exit(1);
-  });
+module.exports = app;

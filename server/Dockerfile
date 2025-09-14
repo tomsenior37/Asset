@@ -1,6 +1,8 @@
 # server/Dockerfile
 FROM node:20-alpine
-WORKDIR /usr/src/app
+
+# Match the path your logs show (/app)
+WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=4000

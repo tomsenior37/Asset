@@ -2,10 +2,14 @@ services:
   mongo:
     image: mongo:7
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    ports: ["27017:27017"]
     volumes:
       - ./data/mongo:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' | grep 1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   server:
     build:
@@ -16,12 +20,18 @@ services:
       MONGO_URL: "mongodb://mongo:27017/assetdb"
       JWT_SECRET: "change-me-in-prod"
       PORT: "4000"
-      ENABLE_REGISTRATION: "0"   # flip to "1" temporarily to self-register
+      ADMIN_EMAIL: "admin@example.com"          # auto-seeded on first boot
+      ADMIN_PASSWORD: "TempPass!123"            # change after login
     depends_on:
-      - mongo
-    ports:
-      - "4000:4000"
+      mongo:
+        condition: service_healthy
+    ports: ["4000:4000"]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   client:
     build:
@@ -29,11 +39,11 @@ services:
       dockerfile: Dockerfile
     image: assetdb-client
     environment:
-      VITE_API_BASE: "/api"
+      VITE_API_BASE: "/api"                     # UI calls /api -> nginx -> server:4000
     depends_on:
-      - server
-    ports:
-      - "80:80"
+      server:
+        condition: service_healthy
+    ports: ["80:80"]
     restart: unless-stopped
 
 networks:

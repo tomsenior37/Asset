@@ -1,67 +1,68 @@
-name: CI
-on:
-  push:
-  pull_request:
+ name: CI
+-on:
+-  push:
+-  pull_request:
++on:
++  push:
++  pull_request:
++  workflow_dispatch: {}
 
-permissions:
-  contents: read
+ permissions:
+   contents: read
 
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+ jobs:
+   build-and-test:
+     runs-on: ubuntu-latest
+     steps:
+       - uses: actions/checkout@v4
 
-      # -------- Node 20 for everything --------
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      # -------- Server (optional) --------
-      - name: Server install
-        if: hashFiles('server/package.json') != ''
-        working-directory: server
-        run: npm ci
-
-      - name: Server lint & test
-        if: hashFiles('server/package.json') != ''
-        working-directory: server
-        run: |
-          npm run lint --if-present
-          npm test --if-present -- --ci
-
-      - name: Server build
-        if: hashFiles('server/package.json') != ''
-        working-directory: server
-        run: npm run build --if-present
-
-      # -------- Client (optional) --------
-      - name: Client install
-        if: hashFiles('client/package.json') != ''
-        working-directory: client
-        run: npm ci
-
-      - name: Client lint & test
-        if: hashFiles('client/package.json') != ''
-        working-directory: client
-        run: |
-          npm run lint --if-present
-          npm test --if-present -- --ci
-
-      - name: Client build
-        if: hashFiles('client/package.json') != ''
-        working-directory: client
-        run: npm run build --if-present
-
-      # -------- Single-repo (no subdirs) fallback --------
-      - name: Root install (fallback)
-        if: hashFiles('server/package.json') == '' && hashFiles('client/package.json') == '' && hashFiles('package.json') != ''
-        run: npm ci
-
-      - name: Root lint/test/build (fallback)
-        if: hashFiles('server/package.json') == '' && hashFiles('client/package.json') == '' && hashFiles('package.json') != ''
-        run: |
-          npm run lint --if-present
-          npm test --if-present -- --ci
-          npm run build --if-present
+-      # -------- Node 20 for everything --------
+-      - uses: actions/setup-node@v4
+-        with:
+-          node-version: '20'
+-          cache: 'npm'
++      # -------- Node 20 with cache if any lockfile exists --------
++      - name: Setup Node (cached)
++        if: |
++          hashFiles('package-lock.json') != '' ||
++          hashFiles('yarn.lock') != '' ||
++          hashFiles('npm-shrinkwrap.json') != '' ||
++          hashFiles('server/package-lock.json') != '' ||
++          hashFiles('server/yarn.lock') != '' ||
++          hashFiles('server/npm-shrinkwrap.json') != '' ||
++          hashFiles('client/package-lock.json') != '' ||
++          hashFiles('client/yarn.lock') != '' ||
++          hashFiles('client/npm-shrinkwrap.json') != ''
++        uses: actions/setup-node@v4
++        with:
++          node-version: '20'
++          cache: npm
++          cache-dependency-path: |
++            package-lock.json
++            npm-shrinkwrap.json
++            yarn.lock
++            server/package-lock.json
++            server/npm-shrinkwrap.json
++            server/yarn.lock
++            client/package-lock.json
++            client/npm-shrinkwrap.json
++            client/yarn.lock
++
++      # -------- Node 20 without cache if no lockfiles but package.json exists --------
++      - name: Setup Node (no cache)
++        if: |
++          (hashFiles('package.json') != '' ||
++           hashFiles('server/package.json') != '' ||
++           hashFiles('client/package.json') != '') &&
++          (hashFiles('package-lock.json') == '' &&
++           hashFiles('yarn.lock') == '' &&
++           hashFiles('npm-shrinkwrap.json') == '' &&
++           hashFiles('server/package-lock.json') == '' &&
++           hashFiles('server/yarn.lock') == '' &&
++           hashFiles('server/npm-shrinkwrap.json') == '' &&
++           hashFiles('client/package-lock.json') == '' &&
++           hashFiles('client/yarn.lock') == '' &&
++           hashFiles('client/npm-shrinkwrap.json') == '')
++        uses: actions/setup-node@v4
++        with:
++          node-version: '20'

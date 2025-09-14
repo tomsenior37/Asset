@@ -20,8 +20,8 @@ services:
       MONGO_URL: "mongodb://mongo:27017/assetdb"
       JWT_SECRET: "change-me-in-prod"
       PORT: "4000"
-      ADMIN_EMAIL: "admin@example.com"          # auto-seeded on first boot
-      ADMIN_PASSWORD: "TempPass!123"            # change after login
+      ADMIN_EMAIL: "admin@example.com"
+      ADMIN_PASSWORD: "TempPass!123"
     depends_on:
       mongo:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       dockerfile: Dockerfile
     image: assetdb-client
     environment:
-      VITE_API_BASE: "/api"                     # UI calls /api -> nginx -> server:4000
+      VITE_API_BASE: "/api"
     depends_on:
       server:
         condition: service_healthy

@@ -1,12 +1,12 @@
 // server/src/db.js
-import { MongoClient } from 'mongodb';
+const { MongoClient } = require('mongodb');
 
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/assetdb';
 
 let _client;
 let _db;
 
-export async function connect() {
+async function connect() {
   if (_db) return _db;
   _client = new MongoClient(MONGO_URL, { ignoreUndefined: true });
   await _client.connect();
@@ -15,7 +15,7 @@ export async function connect() {
   return _db;
 }
 
-export async function usersCollection() {
+async function usersCollection() {
   const db = await connect();
   const names = (await db.listCollections().toArray()).map(n => n.name);
   const colName = names.includes('users')
@@ -23,3 +23,5 @@ export async function usersCollection() {
     : (names.includes('accounts') ? 'accounts' : 'users');
   return db.collection(colName);
 }
+
+module.exports = { connect, usersCollection };

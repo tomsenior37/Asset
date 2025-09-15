@@ -6,25 +6,27 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 /**
  * Canonical axios instance for the app.
- * We name it `api` to match existing imports in the codebase:
- *   import { api } from './api';
+ * Many pages do:  import { api } from './api'
  */
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 15000,
 });
 
-// Attach token automatically if present
+// Attach token automatically if present (supports legacy key names)
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('assetdb_token') || localStorage.getItem('token');
+  const token =
+    localStorage.getItem('assetdb_token') ||
+    localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// ----- Convenience wrappers (use if you prefer function calls) -----
+/* =========================================================
+   Clients / Sites / Areas
+   ========================================================= */
 export async function getClients() {
   const { data } = await api.get('/clients');
-  // If backend returns { items: [...] }, normalize here:
   return Array.isArray(data) ? data : (data.items ?? data);
 }
 
@@ -53,5 +55,46 @@ export async function createArea(siteId, payload) {
   return data;
 }
 
-// Optional alias for legacy code that imported `http`
+/* =========================================================
+   Suppliers  (matches: import { listSuppliers, createSupplier } ...)
+   ========================================================= */
+export async function listSuppliers(params = {}) {
+  const { data } = await api.get('/suppliers', { params });
+  return Array.isArray(data) ? data : (data.items ?? data);
+}
+
+export async function createSupplier(payload) {
+  const { data } = await api.post('/suppliers', payload);
+  return data;
+}
+
+/* =========================================================
+   Parts  (prevent next missing-export errors)
+   ========================================================= */
+export async function listParts(params = {}) {
+  const { data } = await api.get('/parts', { params });
+  return Array.isArray(data) ? data : (data.items ?? data);
+}
+
+export async function createPart(payload) {
+  const { data } = await api.post('/parts', payload);
+  return data;
+}
+
+/* =========================================================
+   Assets  (prevent next missing-export errors)
+   ========================================================= */
+export async function listAssets(params = {}) {
+  const { data } = await api.get('/assets', { params });
+  return Array.isArray(data) ? data : (data.items ?? data);
+}
+
+export async function createAsset(payload) {
+  const { data } = await api.post('/assets', payload);
+  return data;
+}
+
+/* =========================================================
+   Legacy alias some code uses
+   ========================================================= */
 export { api as http };

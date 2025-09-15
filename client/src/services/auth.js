@@ -1,18 +1,27 @@
+// client/src/services/auth.js
 import { api } from './api';
 
 const TOKEN_KEY = 'assetdb_token';
 
-export function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
-export function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
-export function clearToken() { localStorage.removeItem(TOKEN_KEY); }
-
-export async function login(email, password){
+export async function login(email, password) {
   const { data } = await api.post('/auth/login', { email, password });
-  setToken(data.token);
-  return data;
+  if (data?.token) {
+    localStorage.setItem(TOKEN_KEY, data.token);
+  }
+  return data; // { token, user }
 }
 
-export async function me(){
-  const { data } = await api.get('/auth/me', { headers: { Authorization: 'Bearer ' + getToken() }});
-  return data.user;
+export function logout() {
+  localStorage.removeItem(TOKEN_KEY);
 }
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function isAuthenticated() {
+  return !!getToken();
+}
+
+// For convenience if some code expects default
+export default { login, logout, getToken, isAuthenticated };

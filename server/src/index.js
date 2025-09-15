@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 
 import authOptional from './middleware/auth.js';
 
-// Your route modules (present in this repo snapshot)
+// Route modules (present in repo)
 import authRouter from './routes/auth.js';
 import clientsRouter from './routes/clients.js';
 import locationsRouter from './routes/locations.js';
@@ -15,13 +15,15 @@ import partsRouter from './routes/parts.js';
 import suppliersRouter from './routes/suppliers.js';
 import bomTemplatesRouter from './routes/bomTemplates.js';
 
+import path from 'path';
+
 const PORT = Number(process.env.PORT || process.env.API_PORT || 4000);
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/assetdb';
 const CORS_ORIGIN = (process.env.CORS_ORIGIN || '*').trim();
 
 const app = express();
 
-// CORS: '*' => allow all; otherwise support CSV of origins
+// CORS: "*" allows all; otherwise support CSV of origins
 const corsOption =
   CORS_ORIGIN === '*'
     ? { origin: true }
@@ -38,11 +40,9 @@ app.use(express.json({ limit: '8mb' }));
 app.use(morgan('dev'));
 app.use(authOptional);
 
-// Health first — always available, even before DB connects
+// Health is always available (reports DB state)
 let dbState = 'connecting'; // 'connecting' | 'connected' | 'error'
-app.get('/api/health', (_req, res) =>
-  res.json({ ok: true, db: dbState })
-);
+app.get('/api/health', (_req, res) => res.json({ ok: true, db: dbState }));
 
 // Routes
 app.use('/api/auth', authRouter);
@@ -53,19 +53,18 @@ app.use('/api/parts', partsRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/bom-templates', bomTemplatesRouter);
 
-// Static uploads (if used)
-import path from 'path';
+// Static uploads
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // 404 JSON
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
-// Start server immediately; connect to Mongo in background
+// Start HTTP server immediately
 const server = app.listen(PORT, () => {
   console.log(`Server on :${PORT}`);
 });
 
-// Background Mongo connect with status tracking
+// Connect to Mongo in background; never exit process on failure
 mongoose
   .connect(MONGO_URI, { autoIndex: true })
   .then(() => {
@@ -75,9 +74,9 @@ mongoose
   .catch((e) => {
     dbState = 'error';
     console.error('Mongo connection error:', e.message);
-    // keep serving health & static/error routes so deploy stays reachable
+    // keep serving health and static/error routes
   });
 
-// Optional: graceful shutdown
+// Graceful shutdown
 process.on('SIGTERM', () => server.close(() => process.exit(0)));
-process.on('SIGINT', () => server.close(() => process.exit(0)));
+process.on('SIGINT',  () => server.close(() => process.exit(0)));

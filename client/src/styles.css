@@ -1,9 +1,0 @@
-* { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, Arial, sans-serif; }
-.header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #111; color: #fff; }
-.header nav a { color: #aaa; margin-right: 12px; text-decoration: none; }
-.header nav a.active { color: #fff; text-decoration: underline; }
-.main { padding: 16px; }
-.card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-input, select, button { padding: 8px; margin: 4px 0; }
-.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }

@@ -6,9 +6,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Build with Vite using VITE_API_BASE passed by compose
+# Build the SPA with the API base injected by compose (default=/api)
+ARG VITE_API_BASE=/api
+ENV VITE_API_BASE=${VITE_API_BASE}
 COPY . .
-RUN VITE_API_BASE=${VITE_API_BASE:-/api} npm run build
+RUN npm run build
 
 # --- serve stage ---
 FROM nginx:alpine
